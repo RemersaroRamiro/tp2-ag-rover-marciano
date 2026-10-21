@@ -37,8 +37,10 @@ El diseño de referencia, de escala similar al Perseverance, no llega a la meta 
 
 ## Ver los resultados
 
-- **Google Colab:** abrir el notebook y, en la sección 0, descomentar las líneas que clonan el repositorio e instalan
-  DEAP. El notebook corre en modo "solo resultados" y no necesita MuJoCo.
+- **GitHub:** `TP2_AG_Rover.ipynb` se ve directamente en el navegador, con las tablas y los gráficos ya ejecutados.
+- **Google Colab:** [abrir el notebook en Colab](https://colab.research.google.com/github/RemersaroRamiro/tp2-ag-rover-marciano/blob/main/TP2_AG_Rover.ipynb)
+  y, en la sección 0, descomentar las líneas que clonan el repositorio e instalan DEAP. El notebook corre en modo
+  "solo resultados" y no necesita MuJoCo.
 - **Local:** con [uv](https://docs.astral.sh/uv/) instalado, `uv sync` y luego
   `uv run --with jupyterlab jupyter lab TP2_AG_Rover.ipynb`.
 - **Tabla comparativa en la terminal:** `uv run python codigo/evolve.py --summarize logs-corridas`.
