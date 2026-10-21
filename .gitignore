@@ -1,0 +1,6 @@
+.venv/
+__pycache__/
+*.pyc
+.ipynb_checkpoints/
+# Corridas nuevas lanzadas desde el notebook o la terminal
+runs/
