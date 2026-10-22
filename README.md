@@ -13,9 +13,9 @@ las reglas de factibilidad de Deb.
 
 | Carpeta o archivo | Qué contiene |
 |---|---|
-| `TP2_AG_Rover.ipynb` | Notebook con las secciones de la demo de la cátedra. Está guardado ya ejecutado con los resultados del informe. |
+| `TP2_AG_Rover.ipynb` | El Algoritmo Genético completo, escrito con las secciones de la demo de la cátedra. Está guardado ya ejecutado con los resultados del informe. |
 | `logs-corridas/` | Las corridas del informe: `generations.csv` (log por generación), `run.json` (configuración y validación) y los gráficos de aptitud y de diversidad de cada una. |
-| `codigo/` | El código del Algoritmo Genético y del simulador, con los datos de la pista. |
+| `codigo/` | El simulador (caja negra para el notebook) y el programa de terminal que generó las corridas, con los datos de la pista. Cada archivo empieza con una explicación en español de para qué existe. |
 | `pyproject.toml`, `uv.lock` | Dependencias: Python 3.12, DEAP, MuJoCo, NumPy y Matplotlib. |
 
 ## Corridas del informe
@@ -39,8 +39,8 @@ El diseño de referencia, de escala similar al Perseverance, no llega a la meta 
 
 - **GitHub:** `TP2_AG_Rover.ipynb` se ve directamente en el navegador, con las tablas y los gráficos ya ejecutados.
 - **Google Colab:** [abrir el notebook en Colab](https://colab.research.google.com/github/RemersaroRamiro/tp2-ag-rover-marciano/blob/main/TP2_AG_Rover.ipynb)
-  y, en la sección 0, descomentar las líneas que clonan el repositorio e instalan DEAP. El notebook corre en modo
-  "solo resultados" y no necesita MuJoCo.
+  y usar **Entorno de ejecución → Ejecutar todas**. La primera celda clona el repositorio e instala DEAP; el notebook
+  corre en modo resultados y no necesita MuJoCo.
 - **Local:** con [uv](https://docs.astral.sh/uv/) instalado, `uv sync` y luego
   `uv run --with jupyterlab jupyter lab TP2_AG_Rover.ipynb`.
 - **Tabla comparativa en la terminal:** `uv run python codigo/evolve.py --summarize logs-corridas`.
@@ -63,15 +63,22 @@ aleatoria, unos 17 minutos. `uv run python codigo/evolve.py --help` lista todos 
 
 ## Mapa del código
 
-| Parte del AG | Archivo |
-|---|---|
-| Cromosoma: los 15 genes y su decodificación en valores físicos | `codigo/genome_spec.py`, `codigo/rover_params.py` |
-| Función de aptitud y reglas de Deb | `codigo/fitness.py` |
-| Operadores genéticos en DEAP (selección, cruzamiento, mutación), elitismo y ciclo de generaciones | `codigo/ga.py` |
-| Corrida completa, validación en terrenos nuevos y criterio de éxito | `codigo/evolve.py` |
-| Búsqueda aleatoria (línea de base) | `codigo/baselines.py` |
-| Simulación de cada rover (MuJoCo): pista, rocas, rover, controlador y energía | `codigo/evaluate.py` y los módulos que importa (`track_*.py`, `mars_*.py`, `rover*.py`, `controller.py`, `energy.py`, `scene.py`, `headless.py`) |
-| Gráficos y tablas del notebook | `codigo/plot_run.py`, `codigo/notebook_support.py` |
+El Algoritmo Genético se lee en el notebook; `codigo/` es el simulador y el programa de terminal.
+
+| Parte del AG | En el notebook | En `codigo/` (lo que usó `evolve.py` para las corridas) |
+|---|---|---|
+| Cromosoma: los 15 genes y su decodificación en valores físicos | sección 3, "Estructura del cromosoma" | `genome_spec.py` |
+| Función de aptitud y reglas de Deb | sección 3, "Función de aptitud" | `fitness.py` |
+| Operadores genéticos en DEAP (selección, cruzamiento, mutación), reflexión, σ adaptativa y elitismo | sección 3, "Operadores genéticos" | `ga.py` |
+| Ciclo de generaciones | sección 4, "Ciclo de generaciones" | `ga.py` |
+| Corrida completa, validación en terrenos nuevos y criterio de éxito | sección 4, "Ejecución de la corrida" | `evolve.py` |
+| Búsqueda aleatoria (línea de base) | resultados en la sección 4 | `baselines.py` |
+| Simulación de cada rover (MuJoCo): pista, rocas, rover, controlador y energía | caja negra | `evaluate.py` y los módulos que importa (`track_*.py`, `mars_*.py`, `rover*.py`, `controller.py`, `energy.py`, `scene.py`, `headless.py`) |
+| Gráficos | sección 5 | `plot_run.py` (los PNG de `logs-corridas/`) |
+
+La celda "Comprobación" de la sección 4 demuestra que el AG del notebook es el mismo que el de `codigo/ga.py`: con la
+misma semilla generan exactamente las mismas poblaciones, y la aptitud del notebook coincide con la registrada en las
+corridas.
 
 ## Créditos
 
