@@ -1108,7 +1108,6 @@ dependencies = [
     { name = "matplotlib" },
     { name = "mujoco" },
     { name = "numpy" },
-    { name = "pillow" },
 ]
 
 [package.dev-dependencies]
@@ -1122,7 +1121,6 @@ requires-dist = [
     { name = "matplotlib", specifier = ">=3.11.2" },
     { name = "mujoco", specifier = ">=3.2" },
     { name = "numpy", specifier = ">=2.0" },
-    { name = "pillow", specifier = ">=10" },
 ]
 
 [package.metadata.requires-dev]
