@@ -6,6 +6,7 @@ Para qué existe
     y dónde, con una distribución publicada para los sitios de aterrizaje en Marte.
 
 Qué contiene
+    - Rock: una roca elipsoidal (posición, semiejes y orientación).
     - cumulative_rocks_per_m2: cantidad de rocas por m² con diámetro mayor o igual que D.
     - sample_diameters: sortea diámetros que siguen esa distribución.
     - plan_track_rocks: genera las rocas de la pista y de sus márgenes para una semilla.
@@ -18,8 +19,8 @@ Cómo funciona
     rugosidad del terreno.
 
 Dónde encaja
-    Etapa: simulación (pista). Usa track_sections, track_terrain, mars_terrain, mars_params y
-    genome_spec. Lo usan scene.py y headless.py.
+    Etapa: simulación (pista). Usa track_sections, track_terrain, mars_params y genome_spec.
+    Lo usa headless.py.
 
 Fuentes
     - Golombek et al.: modelo de fracción de área acumulada cubierta por rocas en Marte.
@@ -27,13 +28,13 @@ Fuentes
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from functools import lru_cache
 
 import numpy as np
 
 import genome_spec
 import mars_params as mp
-import mars_terrain as mt
 import track_sections as ts
 import track_terrain as tt
 
@@ -43,6 +44,20 @@ SLAB_M = 2.0
 
 LANE_ROCK_MAX_HEIGHT_M = next(g for g in genome_spec.GENES if g.name == "wheel_diameter_m").high
 LANE_ROCK_BAND_M = mp.LANE_WIDTH_M / 2 + mp.ROVER_REACH_M
+
+
+@dataclass(frozen=True)
+class Rock:
+    x: float
+    y: float
+    z: float
+    sx: float
+    sy: float
+    sz: float
+    yaw: float
+    pitch: float = 0.0
+    roll: float = 0.0
+    shade: float = 1.0
 
 
 def expint_e1(x):
@@ -105,7 +120,7 @@ def semi_height_m(visible_height_m: float):
     return 0.5 * visible_height_m / (1.0 - mp.ROCK_EMBEDDED_FRACTION)
 
 
-def visible_height_m(rock: mt.Rock) -> float:
+def visible_height_m(rock: Rock) -> float:
     return 2.0 * rock.sz * (1.0 - mp.ROCK_EMBEDDED_FRACTION)
 
 
@@ -117,7 +132,7 @@ def unsurmountable(abs_y, visible_height_m, max_height_m: float | None = None) -
 def _build_rocks(
     rng: np.random.Generator, terrain: tt.TrackTerrain, x: np.ndarray, y: np.ndarray, diameters: np.ndarray,
     max_lane_height_m: float | None = None,
-) -> list[mt.Rock]:
+) -> list[Rock]:
     count = len(x)
     yaw = rng.uniform(0.0, 2 * np.pi, size=count)
     aspect = rng.uniform(0.65, 1.0, size=count)
@@ -135,7 +150,7 @@ def _build_rocks(
     z = ground + visible_height - sz
     doomed = unsurmountable(np.abs(y), visible_height, max_lane_height_m)
     return [
-        mt.Rock(
+        Rock(
             float(x[i]), float(y[i]), float(z[i]), float(sx[i]), float(sy[i]), float(sz[i]), float(yaw[i]),
             pitch=float(tilt[0, i]), roll=float(tilt[1, i]), shade=float(shade[i]),
         )
@@ -144,7 +159,7 @@ def _build_rocks(
     ]
 
 
-def plan_track_rocks(terrain: tt.TrackTerrain, seed: int, max_lane_rock_height_m: float | None = None) -> list[mt.Rock]:
+def plan_track_rocks(terrain: tt.TrackTerrain, seed: int, max_lane_rock_height_m: float | None = None) -> list[Rock]:
     rng = np.random.default_rng([seed, _STREAM_ROCKS])
     sections = terrain.sections or ts.default_sections(terrain.length_m)
     length, half_lane, (band_lo, band_hi) = terrain.length_m, mp.LANE_WIDTH_M / 2, mp.ROCK_GRADED_BAND_M

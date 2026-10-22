@@ -13,17 +13,16 @@ Cómo funciona
     En cada lote se generan al azar (uniformes en [0, 1]) tantos genomas como individuos tiene la
     población del AG, y se evalúan con la misma aptitud y en los mismos terrenos que la generación
     equivalente del AG. Al final, los 3 mejores diseños de todos los lotes y el rover de referencia se
-    validan en los mismos terrenos no vistos que usa el AG. No guarda grabaciones (replay).
+    validan en los mismos terrenos no vistos que usa el AG.
     uv run python codigo/evolve.py --random-search --preset normal --seed 1
 
 Dónde encaja
-    Etapa: resultados. Reutiliza evolve (el ciclo de una corrida), ga y replay.
+    Etapa: resultados. Reutiliza evolve (el ciclo de una corrida) y ga.
     evolve.py lo llama con la opción --random-search.
 """
 
 from __future__ import annotations
 
-import dataclasses
 import math
 import time
 from pathlib import Path
@@ -32,17 +31,12 @@ import numpy as np
 
 import evolve
 import ga
-import replay as replay_files
 
 
 class RandomSearchRun(evolve._Run):
     kind = "random_search"
     unit = "lote"
-    records_replay = False
     chart_title = "búsqueda aleatoria"
-
-    def __init__(self, config: evolve.EvolveConfig, out_dir: Path, pool, log):
-        super().__init__(dataclasses.replace(config, replay=replay_files.ReplayPolicy(mode="none")), out_dir, pool, log)
 
     def method_manifest(self) -> dict:
         p = self.config.preset

@@ -20,7 +20,7 @@ Cómo funciona
 
 Dónde encaja
     Etapa: cromosoma. No importa otros archivos del proyecto.
-    Lo usan ga, rover, evaluate, evolve, replay, reference_rovers y track_rocks. El notebook lo
+    Lo usan ga, rover, evaluate, evolve, reference_rovers y track_rocks. El notebook lo
     importa para mostrar la tabla de genes.
 
 Fuentes

@@ -21,7 +21,7 @@ Cómo funciona
 
 Dónde encaja
     Etapa: operadores y ciclo de generaciones. Usa genome_spec para el largo del genoma.
-    Lo usan evolve, baselines, fitness y replay. El notebook lo compara con su propio AG para
+    Lo usan evolve, baselines y fitness. El notebook lo compara con su propio AG para
     comprobar que ambos producen los mismos resultados.
 """
 

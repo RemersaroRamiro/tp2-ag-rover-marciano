@@ -1,10 +1,10 @@
 """
-headless.py: el modelo físico de la pista sin nada visual, para evaluar rovers más rápido.
+headless.py: el modelo físico de la pista para MuJoCo, sin nada visual.
 
 Para qué existe
-    La escena completa (scene) trae texturas, luces, cámaras y terreno lejano que no afectan la física.
-    Este archivo arma, a partir del mismo mundo generado, un modelo que conserva solo lo que puede
-    tocar a un rover, y así cada simulación es mucho más liviana.
+    Cada evaluación necesita un modelo MuJoCo de la pista con un rover encima. Este archivo lo arma a
+    partir del terreno y las rocas de una semilla, conservando solo lo que puede tocar a un rover, así
+    cada simulación es liviana. No incluye ningún elemento visual.
 
 Qué contiene
     - generate_headless_world: el terreno y las rocas de una semilla, recortados a la zona alcanzable.
@@ -12,15 +12,17 @@ Qué contiene
     - build_model: compila esa zona con un rover en su posición de salida.
     - RockWindows y transfer_state: cargan solo las rocas cercanas al rover y cambian de modelo a mitad
       de la corrida sin perder el estado de la simulación.
+    - MARS_GRAVITY, TIMESTEP_S y GROUND_PRIORITY: la gravedad, el paso que declara el MJCF (build_model
+      lo reemplaza por el de EvalConfig) y la prioridad de contacto del suelo y las rocas.
 
 Cómo funciona
     Se conservan intactos el terreno de colisión, su fricción y las rocas alcanzables. Se quita lo
-    visual y lo inalcanzable: la corrida termina si el centro del rover se aleja más de 10 m del eje
-    del carril, y ninguna parte del rover está a más de ROVER_REACH_M de su centro.
+    inalcanzable: la corrida termina si el centro del rover se aleja más de 10 m del eje del carril, y
+    ninguna parte del rover está a más de ROVER_REACH_M de su centro.
 
 Dónde encaja
-    Etapa: simulación. Usa track_terrain, track_rocks, track_sections, mars_terrain, scene, rover y
-    mars_params. Lo usa evaluate.py.
+    Etapa: simulación. Usa track_terrain, track_rocks, track_sections, rover y mars_params.
+    Lo usa evaluate.py.
 """
 
 from __future__ import annotations
@@ -33,9 +35,7 @@ import mujoco
 import numpy as np
 
 import mars_params as mp
-import mars_terrain as mt
 import rover
-import scene
 import track_rocks as tr
 import track_sections as ts
 import track_terrain as tt
@@ -49,6 +49,10 @@ X_AHEAD_M = ROVER_REACH_M + CROP_MARGIN_M
 
 HFIELD_BASE_M = 2.0
 HYSTERESIS_M = 2.0
+
+MARS_GRAVITY = -mp.MARS_GRAVITY_M_S2
+TIMESTEP_S = 0.002
+GROUND_PRIORITY = 1
 
 
 def design_reach_bound_m(design: rover.RoverDesign) -> float:
@@ -83,7 +87,7 @@ class HeadlessTile:
 class HeadlessWorld:
     seed: int
     terrain: tt.TrackTerrain
-    rocks: list[mt.Rock]
+    rocks: list[tr.Rock]
     tiles: tuple[HeadlessTile, ...]
     head_xml: str
     rock_lines: tuple[str, ...]
@@ -101,7 +105,7 @@ class HeadlessWorld:
     def section_at(self, x: float) -> ts.Section:
         return ts.section_at(x, self.sections)
 
-    def rocks_between(self, x_lo: float, x_hi: float) -> list[mt.Rock]:
+    def rocks_between(self, x_lo: float, x_hi: float) -> list[tr.Rock]:
         keep = (self.rock_x_hi >= x_lo) & (self.rock_x_lo <= x_hi)
         return [r for r, k in zip(self.rocks, keep) if k]
 
@@ -133,21 +137,49 @@ class RockWindows:
         return lo - margin, hi + margin
 
 
-def _rock_in_window(r: mt.Rock, x_lo: float, x_hi: float) -> bool:
+def _rock_in_window(r: tr.Rock, x_lo: float, x_hi: float) -> bool:
     extent = max(r.sx, r.sy, r.sz)
     return abs(r.y) - extent <= LATERAL_CROP_M and x_lo <= r.x + extent and r.x - extent <= x_hi
 
 
-def _rock_lines(rocks: list[mt.Rock]) -> list[str]:
+def _rock_quat(r: tr.Rock) -> np.ndarray:
+    def about(axis: int, angle: float) -> np.ndarray:
+        q = np.zeros(4)
+        q[0], q[1 + axis] = np.cos(angle / 2), np.sin(angle / 2)
+        return q
+
+    def mul(a: np.ndarray, b: np.ndarray) -> np.ndarray:
+        w1, x1, y1, z1 = a
+        w2, x2, y2, z2 = b
+        return np.array([
+            w1 * w2 - x1 * x2 - y1 * y2 - z1 * z2, w1 * x2 + x1 * w2 + y1 * z2 - z1 * y2,
+            w1 * y2 - x1 * z2 + y1 * w2 + z1 * x2, w1 * z2 + x1 * y2 - y1 * x2 + z1 * w2,
+        ])
+
+    return mul(mul(about(2, r.yaw), about(1, r.pitch)), about(0, r.roll))
+
+
+def _rock_lines(rocks: list[tr.Rock]) -> list[str]:
     friction = f"{mp.ROCK_FRICTION} {mp.SPIN_FRICTION} {mp.ROLL_FRICTION}"
     lines = []
     for r in rocks:
-        q = scene._rock_quat(r)
+        q = _rock_quat(r)
         lines.append(
             f'<geom type="ellipsoid" size="{r.sx:.4f} {r.sy:.4f} {r.sz:.4f}" pos="{r.x:.4f} {r.y:.4f} {r.z:.4f}" '
-            f'quat="{q[0]:.5f} {q[1]:.5f} {q[2]:.5f} {q[3]:.5f}" friction="{friction}" priority="{scene.GROUND_PRIORITY}"/>'
+            f'quat="{q[0]:.5f} {q[1]:.5f} {q[2]:.5f} {q[3]:.5f}" friction="{friction}" priority="{GROUND_PRIORITY}"/>'
         )
     return lines
+
+
+def _grid_rect(terrain: tt.TrackTerrain, col0: int, col1: int, row0: int = 0, row1: int | None = None) -> dict[str, float]:
+    n_rows, n_cols = terrain.heights.shape
+    row1 = n_rows - 1 if row1 is None else row1
+    cell_x = (terrain.x_max - terrain.x_min) / (n_cols - 1)
+    cell_y = (terrain.y_max - terrain.y_min) / (n_rows - 1)
+    return {
+        "cx": terrain.x_min + 0.5 * (col0 + col1) * cell_x, "cy": terrain.y_min + 0.5 * (row0 + row1) * cell_y,
+        "hx": 0.5 * (col1 - col0) * cell_x, "hy": 0.5 * (row1 - row0) * cell_y,
+    }
 
 
 def _window_tiles(terrain: tt.TrackTerrain, x_lo: float, x_hi: float) -> list[HeadlessTile]:
@@ -167,14 +199,14 @@ def _window_tiles(terrain: tt.TrackTerrain, x_lo: float, x_hi: float) -> list[He
         low = float(whole.min())
         span = max(float(whole.max()) - low, 1e-6)
         part = terrain.heights[row0 : row1 + 1, col0 : col1 + 1]
-        rect = scene._grid_rect(terrain, col0, col1, row0, row1)
+        rect = _grid_rect(terrain, col0, col1, row0, row1)
         name = f"terrain_tile_{i}"
         tiles.append(HeadlessTile(
             name=name,
             asset_xml=f'<hfield name="{name}" nrow="{part.shape[0]}" ncol="{part.shape[1]}" '
                       f'size="{rect["hx"]:.6f} {rect["hy"]:.6f} {span:.5f} {HFIELD_BASE_M}"/>',
             geom_xml=f'<geom name="{name}" type="hfield" hfield="{name}" pos="{rect["cx"]:.6f} {rect["cy"]:.6f} {low:.5f}" '
-                     f'friction="{tile.friction:.4f} {mp.SPIN_FRICTION} {mp.ROLL_FRICTION}" priority="{scene.GROUND_PRIORITY}"/>',
+                     f'friction="{tile.friction:.4f} {mp.SPIN_FRICTION} {mp.ROLL_FRICTION}" priority="{GROUND_PRIORITY}"/>',
             data=((part - low) / span).astype(np.float32).ravel(),
         ))
     return tiles
@@ -188,7 +220,7 @@ def generate_headless_world(seed: int = 0, cell_m: float = mp.TRACK_CELL_M, stri
     rocks = [r for r in tr.plan_track_rocks(terrain, seed, max_lane_rock_height_m) if _rock_in_window(r, x_lo, x_hi)]
     tiles = _window_tiles(terrain, x_lo, x_hi)
     head = f"""<mujoco model="jezero_headless">
-  <option gravity="0 0 {scene.MARS_GRAVITY}" timestep="{scene.TIMESTEP_S}" integrator="implicitfast"/>
+  <option gravity="0 0 {MARS_GRAVITY}" timestep="{TIMESTEP_S}" integrator="implicitfast"/>
   <statistic center="{terrain.length_m / 2:.1f} 0 0" extent="100"/>
   <asset>
 {chr(10).join("    " + t.asset_xml for t in tiles)}
@@ -205,7 +237,7 @@ def build_model(
     world: HeadlessWorld, design: rover.RoverDesign, prefix: str, pos, yaw: float, timestep_s: float,
     rock_range: tuple[float, float] | None = None,
 ) -> mujoco.MjModel:
-    parts = rover.rover_mjcf(design, prefix, pos, yaw, visual=False)
+    parts = rover.rover_mjcf(design, prefix, pos, yaw)
     xml = (
         f"{world.head_xml}{world.rock_xml(rock_range)}\n{parts.body}\n  </worldbody>\n  <actuator>\n{parts.actuator}\n  </actuator>\n"
         f"  <equality>\n{parts.equality}\n  </equality>\n</mujoco>\n"

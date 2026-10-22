@@ -20,10 +20,10 @@ Cómo funciona
     uv run python codigo/evolve.py --preset normal --seed 1
 
 Dónde encaja
-    Etapa: corrida. Llama a ga, evaluate, fitness, seed_schedule, presets, replay, reference_rovers,
-    baselines y plot_run. Guarda run.json, generations.csv, best_genomes.json, populations.npz, las
-    grabaciones de replay/ y los dos gráficos. En modo simulación, el notebook usa el evaluador de
-    este archivo para puntuar cada generación.
+    Etapa: corrida. Llama a ga, evaluate, fitness, seed_schedule, presets, reference_rovers, baselines
+    y plot_run. Guarda run.json, generations.csv, best_genomes.json, populations.npz y los dos
+    gráficos. En modo simulación, el notebook usa el evaluador de este archivo para puntuar cada
+    generación.
 """
 
 from __future__ import annotations
@@ -48,7 +48,6 @@ import ga
 import genome_spec
 import presets
 import reference_rovers
-import replay as replay_files
 from evaluate import SHARED_TRACKS_KEPT, EvalConfig, Evaluator, resolve_workers
 from fitness import FitnessParams, fitness_from_summary, fitness_from_summaries, stop_cluster_fraction
 from seed_schedule import SeedSchedule
@@ -61,7 +60,6 @@ class EvolveConfig:
     workers: int | None = None
     eval_config: EvalConfig = field(default_factory=EvalConfig)
     fitness_params: FitnessParams = field(default_factory=FitnessParams)
-    replay: replay_files.ReplayPolicy = field(default_factory=replay_files.ReplayPolicy)
     validation_seeds: int = params.VALIDATION_SEEDS
     validation_genomes: int = params.VALIDATION_GENOMES
     seed_reference: bool = False
@@ -120,10 +118,8 @@ class GenerationEvaluator:
             self._prefetch(self.schedule.seeds_for_generation(g + 1), rules, keep)
         else:
             self._prefetch(self.schedule.validation, rules, max(SHARED_TRACKS_KEPT, len(seeds) + len(self.schedule.validation)))
-        hz = cfg.replay.hz if cfg.replay.records_generation(g, cfg.preset.generations) else None
-        rates = [hz] + [None] * (len(seeds) - 1)
         t0 = time.perf_counter()
-        by_seed = self.pool.evaluate_seeds(population, seeds, rules, rates)
+        by_seed = self.pool.evaluate_seeds(population, seeds, rules)
         evaluations = [fitness_from_summaries([runs[i] for runs in by_seed], cfg.fitness_params) for i in range(len(population))]
         self.last = GenerationBatch(g, seeds, by_seed, evaluations, time.perf_counter() - t0)
         self.generation += 1
@@ -287,7 +283,6 @@ def log_success(report: dict | None, log) -> None:
 class _Run:
     kind = "ga"
     unit = "gen"
-    records_replay = True
     chart_title = ""
 
     def __init__(self, config: EvolveConfig, out_dir: Path, pool, log):
@@ -317,30 +312,19 @@ class _Run:
             "genome_spec": genome_spec_info(),
             "git": git_info(),
             "environment": environment_info(config.workers, config.preset.population * config.seeds_per_generation),
-            "generations": [], "validation": None, "success": None, "final": None, "timings": None, "sizes": None,
+            "generations": [], "validation": None, "success": None, "final": None, "timings": None,
         }
         self.write_manifest()
 
     def method_manifest(self) -> dict:
         cfg = self.config
         return {"seed_reference": cfg.seed_reference, "ga": dataclasses.asdict(cfg.ga_config()),
-                "ga_operators": ga.describe_operators(cfg.ga_config()), "replay": dataclasses.asdict(cfg.replay)}
+                "ga_operators": ga.describe_operators(cfg.ga_config())}
 
     def write_manifest(self) -> dict:
         self.manifest = ga.jsonable(self.manifest)
         (self.out_dir / "run.json").write_text(json.dumps(self.manifest, indent=2), encoding="utf-8")
         return self.manifest
-
-    def replay_sizes(self) -> list[int]:
-        folder = self.out_dir / "replay"
-        return [p.stat().st_size for p in sorted(folder.iterdir())] if folder.exists() else []
-
-    def write_replay(self, record: ga.GenerationRecord, batch: GenerationBatch) -> int:
-        cfg = self.config
-        npz = replay_files.write_generation(self.out_dir, record.generation, batch.terrain_seed, record.population, batch.summaries[0],
-                                            batch.evaluations, cfg.replay, cfg.preset.generations,
-                                            other_seeds=list(zip(batch.seeds[1:], batch.summaries[1:])))
-        return sum(p.stat().st_size for p in (npz, npz.with_suffix(".json")))
 
     def announce(self) -> None:
         cfg, p = self.config, self.config.preset
@@ -359,7 +343,6 @@ class _Run:
         cfg, batch = self.config, self.batches.last
         assert batch is not None and batch.generation == record.generation
         self.logger.log(record)
-        replay_bytes = self.write_replay(record, batch) if self.records_replay else 0
         details = [e.details for e in batch.evaluations]
         finished, legal = sum(d["finished"] for d in details), sum(d["legal"] for d in details)
         best = record.best_details
@@ -377,7 +360,7 @@ class _Run:
             "finished": finished, "finished_by_seed": finished_by_seed, "legal": legal,
             "stop_cluster_by_seed": clusters, "stop_cluster_scored": scored_cluster,
             "diversity": record.diversity, "sigma": record.sigma,
-            "eval_s": batch.wall_s, "elapsed_s": record.elapsed, "replay_bytes": replay_bytes})
+            "eval_s": batch.wall_s, "elapsed_s": record.elapsed})
         self.write_manifest()
         n, width, many = len(details), len(str(cfg.preset.generations)), len(batch.seeds) > 1
         sigma = f" | sigma {record.sigma:.2f}" if np.isfinite(record.sigma) else ""
@@ -410,15 +393,12 @@ class _Run:
 
     def finish(self, history: ga.RunHistory, validation_s: float, validation: dict) -> dict:
         m = self.manifest
-        sizes = [g["replay_bytes"] for g in m["generations"]]
         m["validation"] = validation
         m["success"] = success_report(validation)
         m["final"] = self.final_summary(history)
         batch_times = [g["eval_s"] for g in m["generations"]]
         m["timings"] = {"total_s": time.perf_counter() - self.t0, "evaluation_s": sum(batch_times), "per_generation_s": batch_times,
                         "validation_s": validation_s}
-        m["sizes"] = {"replay_bytes_total": sum(self.replay_sizes()), "replay_bytes_per_generation_median": float(np.median(sizes)),
-                      "replay_bytes_per_generation_max": max(sizes)}
         m["status"], m["finished_at"] = "finished", _now()
         return self.write_manifest()
 
@@ -485,8 +465,7 @@ def execute(run_type: type[_Run], config: EvolveConfig, out_dir: str | Path, eva
         else:
             pool.release_room()
     write_charts(run.out_dir, log, run.chart_title)
-    replay = f"; replay {manifest['sizes']['replay_bytes_total'] / 1e6:.1f} MB" if run.records_replay else ""
-    log(f"Tiempo total {manifest['timings']['total_s']:.0f} s{replay} en {run.out_dir}")
+    log(f"Tiempo total {manifest['timings']['total_s']:.0f} s en {run.out_dir}")
     return RunResult(history, run.schedule, run.out_dir, manifest)
 
 
@@ -609,7 +588,7 @@ def run_many(config: EvolveConfig, runs: int, base_dir: str | Path, evaluator=No
 
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(
-        description="Evoluciona rovers sin graficos, graba la corrida para verla despues y la valida en terrenos no vistos.",
+        description="Evoluciona rovers sin graficos, guarda la corrida y la valida en terrenos no vistos.",
         epilog="Al terminar, cada corrida guarda junto a su generations.csv los graficos generations_fitness.png (aptitud "
                "maxima y promedio por generacion) y generations_diversity.png (diversidad y sigma de mutacion). Se "
                "regeneran solo desde el CSV, sin simulador: uv run python plot_run.py CARPETA (una corrida o una carpeta "
@@ -628,9 +607,6 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--seeds-per-generation", type=int, default=None,
                    help="terrenos (semillas de rocas) en los que se puntua cada rover de una generacion; la distancia se promedia "
                         "(default: el del preset, 2; con 1 cada generacion tiene un solo terreno)")
-    p.add_argument("--replay", choices=["all", "best", "none"], default="all", help="que rovers se graban para el replay (default: all)")
-    p.add_argument("--replay-best-k", type=int, default=params.REPLAY_BEST_K, help="con --replay best: cuantos por generacion")
-    p.add_argument("--replay-every", type=int, default=1, help="graba las trayectorias cada N generaciones (y la ultima)")
     p.add_argument("--validation-seeds", type=int, default=params.VALIDATION_SEEDS, help="semillas no vistas para validar al final (default: 5)")
     p.add_argument("--max-sim-time", type=float, default=None, help="tope de tiempo simulado por rover, en segundos (default: derivado de la pista)")
     p.add_argument("--summarize", metavar="CARPETA", nargs="+", default=None,
@@ -640,8 +616,8 @@ def build_parser() -> argparse.ArgumentParser:
                    help="linea de base, en vez del AG: busqueda aleatoria con el mismo presupuesto que el AG de este mismo "
                         "comando (poblacion x generaciones evaluaciones de disenos con genes uniformes en [0, 1]; el lote g se "
                         "puntua con la misma aptitud en los terrenos de la generacion g del AG de la misma semilla) y validacion "
-                        "de sus mejores disenos en las mismas semillas de validacion. No graba replay; no acepta las opciones "
-                        "del AG, --seed-reference ni --replay all|best")
+                        "de sus mejores disenos en las mismas semillas de validacion. No acepta las opciones del AG ni "
+                        "--seed-reference")
     d = ga.GAConfig()
     g = p.add_argument_group("algoritmo genetico (DEAP; los valores por defecto son los de la Tabla 1 de la entrega parcial)")
     g.add_argument("--selection", choices=ga.SELECTION_METHODS, default=d.selection,
@@ -671,9 +647,8 @@ def build_parser() -> argparse.ArgumentParser:
     return p
 
 
-GA_ONLY_OPTIONS = ("seed_reference", "replay", "replay_best_k", "replay_every", "selection", "tournament_size", "crossover",
-                   "blx_alpha", "binomial_indpb", "crossover_rate", "mutation_rate", "sigma_min", "sigma_max",
-                   "adaptive_mutation", "elite_count")
+GA_ONLY_OPTIONS = ("seed_reference", "selection", "tournament_size", "crossover", "blx_alpha", "binomial_indpb",
+                   "crossover_rate", "mutation_rate", "sigma_min", "sigma_max", "adaptive_mutation", "elite_count")
 
 
 def config_from_args(args: argparse.Namespace) -> EvolveConfig:
@@ -683,13 +658,12 @@ def config_from_args(args: argparse.Namespace) -> EvolveConfig:
     if args.seeds_per_generation is not None:
         preset = dataclasses.replace(preset, seeds_per_generation=args.seeds_per_generation)
     rules = EvalConfig() if args.max_sim_time is None else EvalConfig(max_sim_time_s=args.max_sim_time)
-    policy = replay_files.ReplayPolicy(mode=args.replay, every=args.replay_every, best_k=args.replay_best_k)
     ga_params = ga.GAConfig(
         population_size=preset.population, seed=args.seed, elite_count=args.elite_count, selection=args.selection,
         tournament_size=args.tournament_size, crossover=args.crossover, crossover_rate=args.crossover_rate,
         blx_alpha=args.blx_alpha, binomial_indpb=args.binomial_indpb, mutation_gene_rate=args.mutation_rate,
         mutation_sigma=args.sigma_min, sigma_max=args.sigma_max, adaptive_mutation=args.adaptive_mutation)
-    return EvolveConfig(preset=preset, seed=args.seed, workers=args.workers, eval_config=rules, replay=policy,
+    return EvolveConfig(preset=preset, seed=args.seed, workers=args.workers, eval_config=rules,
                         validation_seeds=args.validation_seeds, seed_reference=args.seed_reference, ga_params=ga_params)
 
 
@@ -711,8 +685,7 @@ def main(argv: list[str] | None = None) -> int:
         print(format_summary(rows) if rows else f"No hay corridas en {', '.join(args.summarize)}")
         return 0 if rows else 1
     if args.random_search:
-        given = [f"--{name.replace('_', '-')}" for name in GA_ONLY_OPTIONS if getattr(args, name) != parser.get_default(name)
-                 and not (name == "replay" and args.replay == "none")]
+        given = [f"--{name.replace('_', '-')}" for name in GA_ONLY_OPTIONS if getattr(args, name) != parser.get_default(name)]
         if given:
             parser.error(f"--random-search no usa {', '.join(given)} (son opciones del AG)")
     try:

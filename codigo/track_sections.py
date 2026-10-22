@@ -18,8 +18,8 @@ Cómo funciona
     Así ninguna característica aparece de golpe y la distancia recorrida siempre puede mejorar de a poco.
 
 Dónde encaja
-    Etapa: simulación (pista). Usa mars_params. Lo usan track_terrain, track_features, track_rocks,
-    scene y headless.
+    Etapa: simulación (pista). Usa mars_params. Lo usan track_terrain, track_features, track_rocks
+    y headless.
 """
 
 from __future__ import annotations

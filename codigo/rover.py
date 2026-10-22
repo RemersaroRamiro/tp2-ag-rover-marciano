@@ -11,7 +11,7 @@ Qué contiene
     - check_constraints: revisa las restricciones de la misión (masa total, vuelco estático, volumen
       plegado y despeje del suelo) y mide cuánto se excede cada una, en forma relativa.
     - rover_mjcf: genera los cuerpos, los motores y las uniones del rover para MuJoCo.
-    - spawn_pose y build_model_with_rovers: ubican el rover en la salida y compilan la escena.
+    - spawn_pose: ubica el rover en la salida, apoyado sobre el terreno y las rocas.
 
 Cómo funciona
     La geometría es válida por construcción: si dos ruedas se superponen o un brazo es demasiado corto,
@@ -19,8 +19,8 @@ Cómo funciona
     (ruedas, motores, batería, chasis y brazos) más una carga útil fija.
 
 Dónde encaja
-    Etapa: simulación. Usa genome_spec, rover_params y scene.
-    Lo usan evaluate, headless, controller y replay.
+    Etapa: simulación. Usa genome_spec y rover_params.
+    Lo usan evaluate, headless y controller.
 """
 
 from __future__ import annotations
@@ -273,14 +273,6 @@ class RoverXml(NamedTuple):
     equality: str
 
 
-@dataclass(frozen=True)
-class RoverPlacement:
-    design: RoverDesign
-    prefix: str
-    pos: tuple[float, float, float]
-    yaw: float = 0.0
-
-
 def wheel_joint_names(prefix: str) -> list[str]:
     return [f"{prefix}wheel_{w}" for w in WHEEL_IDS]
 
@@ -299,32 +291,13 @@ def _inertial(props: MassProps, origin) -> str:
 
 
 _BODY = 'rgba="0.86 0.85 0.82 1"'
-_ARM = 'rgba="0.62 0.64 0.68 1"'
 _TYRE = 'rgba="0.17 0.17 0.18 1"'
-_SPOKE = 'rgba="0.74 0.74 0.76 1"'
-_DETAIL = 'rgba="0.30 0.31 0.34 1"'
-_NOSE = 'rgba="0.15 0.55 0.75 1"'
-_VISUAL = 'contype="0" conaffinity="0"'
 _COLLIDE = f'contype="{rp.ROVER_CONTYPE}" conaffinity="{rp.ROVER_CONAFFINITY}"'
 
 
-def _capsule(name: str, a, b, origin, visual: bool = True) -> str:
-    if not visual:
-        return ""
-    return (
-        f'<geom name="{name}" type="capsule" group="{rp.ROVER_GROUP}" {_VISUAL} {_ARM} size="{rp.ARM_TUBE_RADIUS_M}" '
-        f'fromto="{_f(*(np.asarray(a) - origin), *(np.asarray(b) - origin))}"/>'
-    )
-
-
-def _wheel_body(p: str, wheel: str, offset, d: RoverDesign, indent: int, visual: bool = True) -> str:
+def _wheel_body(p: str, wheel: str, offset, d: RoverDesign, indent: int) -> str:
     r, w = d.wheel_radius_m, d.wheel_width_m
     pad = " " * indent
-    spokes = "".join(
-        f'{pad}  <geom name="{p}spoke_{wheel}_{k}" type="box" group="{rp.ROVER_GROUP}" {_VISUAL} {_SPOKE} '
-        f'size="{_f(r * 0.92, w / 2 + 0.004, 0.012)}" euler="0 {angle} 0"/>\n'
-        for k, angle in enumerate((0, 60, 120))
-    ) if visual else ""
     return (
         f'{pad}<body name="{p}wheel_{wheel}" pos="{_f(*offset)}">\n'
         f'{pad}  <joint name="{p}wheel_{wheel}" type="hinge" axis="0 1 0" damping="{rp.WHEEL_DAMPING_NMS}" '
@@ -332,19 +305,18 @@ def _wheel_body(p: str, wheel: str, offset, d: RoverDesign, indent: int, visual:
         f"{pad}  {_inertial(d.bodies['wheel_' + wheel], d.wheel_centers[wheel])}\n"
         f'{pad}  <geom name="{p}wheel_{wheel}" type="cylinder" group="{rp.ROVER_GROUP}" {_COLLIDE} {_TYRE} '
         f'size="{_f(r, w / 2)}" euler="90 0 0" friction="{_f(*rp.WHEEL_FRICTION)}"/>\n'
-        f"{spokes}"
         f"{pad}</body>"
     )
 
 
-def rover_mjcf(design: RoverDesign, name_prefix: str, pos, yaw: float = 0.0, visual: bool = True) -> RoverXml:
+def rover_mjcf(design: RoverDesign, name_prefix: str, pos, yaw: float = 0.0) -> RoverXml:
     p, d = name_prefix, design
     r = d.wheel_radius_m
     half_track = d.track_width_m / 2
     quat = _f(math.cos(yaw / 2), 0.0, 0.0, math.sin(yaw / 2))
     origin = np.zeros(3)
     chassis_center = np.array([0.0, 0.0, d.chassis_bottom_z_m + d.chassis_height_m / 2])
-    length, top = d.chassis_length_m, d.chassis_bottom_z_m + d.chassis_height_m
+    length = d.chassis_length_m
     lines = [
         f'<body name="{p}chassis" pos="{_f(*pos)}" quat="{quat}">',
         f'  <freejoint name="{p}free"/>',
@@ -352,39 +324,22 @@ def rover_mjcf(design: RoverDesign, name_prefix: str, pos, yaw: float = 0.0, vis
         f'  <geom name="{p}chassis" type="box" group="{rp.ROVER_GROUP}" {_COLLIDE} {_BODY} '
         f'size="{_f(length / 2, d.chassis_width_m / 2, d.chassis_height_m / 2)}" pos="{_f(*chassis_center)}"/>',
     ]
-    if visual:
-        lines += [
-            f'  <geom name="{p}deck" type="box" group="{rp.ROVER_GROUP}" {_VISUAL} {_DETAIL} '
-            f'size="{_f(length * 0.42, d.chassis_width_m * 0.42, 0.02)}" pos="{_f(0.0, 0.0, top + 0.02)}"/>',
-            f'  <geom name="{p}power" type="cylinder" group="{rp.ROVER_GROUP}" {_VISUAL} {_DETAIL} size="{_f(0.11, length * 0.18)}" '
-            f'pos="{_f(-length / 2 - length * 0.12, 0.0, top - 0.12)}" euler="0 90 0"/>',
-            f'  <geom name="{p}mast" type="capsule" group="{rp.ROVER_GROUP}" {_VISUAL} {_ARM} size="0.035" '
-            f'fromto="{_f(length * 0.35, 0.0, top, length * 0.35, 0.0, top + 0.85)}"/>',
-            f'  <geom name="{p}head" type="box" group="{rp.ROVER_GROUP}" {_VISUAL} {_NOSE} size="0.09 0.22 0.07" '
-            f'pos="{_f(length * 0.35, 0.0, top + 0.9)}"/>',
-        ]
     for side, sign in (("l", 1.0), ("r", -1.0)):
         pivot = np.array([d.rocker_pivot_l[0], sign * half_track, d.rocker_pivot_l[2]])
         bogie = np.array([d.bogie_pivot_l[0], sign * half_track, d.bogie_pivot_l[2]])
         centers = {k: np.array(d.wheel_centers[k + side]) for k in "fmr"}
-        stub_end = np.array([pivot[0], sign * d.chassis_width_m / 2, pivot[2]])
         lines += [
-            "  " + _capsule(f"{p}stub_{side}", stub_end, pivot, origin, visual),
             f'  <body name="{p}rocker_{side}" pos="{_f(*pivot)}">',
             f'    <joint name="{p}rocker_{side}" type="hinge" axis="0 1 0" limited="true" '
             f'range="{_f(-rp.ROCKER_RANGE_DEG, rp.ROCKER_RANGE_DEG)}" damping="{rp.ROCKER_DAMPING_NMS}"/>',
             f"    {_inertial(d.bodies['rocker_' + side], pivot)}",
-            "    " + _capsule(f"{p}rocker_front_{side}", pivot, centers["f"], pivot, visual),
-            "    " + _capsule(f"{p}rocker_rear_{side}", pivot, bogie, pivot, visual),
-            _wheel_body(p, "f" + side, centers["f"] - pivot, d, indent=4, visual=visual),
+            _wheel_body(p, "f" + side, centers["f"] - pivot, d, indent=4),
             f'    <body name="{p}bogie_{side}" pos="{_f(*(bogie - pivot))}">',
             f'      <joint name="{p}bogie_{side}" type="hinge" axis="0 1 0" limited="true" '
             f'range="{_f(-rp.BOGIE_RANGE_DEG, rp.BOGIE_RANGE_DEG)}" damping="{rp.BOGIE_DAMPING_NMS}"/>',
             f"      {_inertial(d.bodies['bogie_' + side], bogie)}",
-            "      " + _capsule(f"{p}bogie_mid_{side}", bogie, centers["m"], bogie, visual),
-            "      " + _capsule(f"{p}bogie_rear_{side}", bogie, centers["r"], bogie, visual),
-            _wheel_body(p, "m" + side, centers["m"] - bogie, d, indent=6, visual=visual),
-            _wheel_body(p, "r" + side, centers["r"] - bogie, d, indent=6, visual=visual),
+            _wheel_body(p, "m" + side, centers["m"] - bogie, d, indent=6),
+            _wheel_body(p, "r" + side, centers["r"] - bogie, d, indent=6),
             "    </body>",
             "  </body>",
         ]
@@ -402,31 +357,6 @@ def rover_mjcf(design: RoverDesign, name_prefix: str, pos, yaw: float = 0.0, vis
     )
 
 
-def flat_scene_xml(placements: Sequence[RoverPlacement], friction: float = 0.5) -> str:
-    parts = [rover_mjcf(pl.design, pl.prefix, pl.pos, pl.yaw) for pl in placements]
-    join = "\n".join
-    return f"""<mujoco model="rover_flat">
-  <option gravity="0 0 -3.71" timestep="0.002" integrator="implicitfast"/>
-  <worldbody>
-    <geom name="ground" type="plane" size="200 200 0.1" friction="{friction} 0.005 0.0001" priority="1"/>
-{join(x.body for x in parts)}
-  </worldbody>
-  <actuator>
-{join(x.actuator for x in parts)}
-  </actuator>
-  <equality>
-{join(x.equality for x in parts)}
-  </equality>
-</mujoco>
-"""
-
-
-def build_flat_model(placements: Sequence[RoverPlacement], friction: float = 0.5):
-    import mujoco
-
-    return mujoco.MjModel.from_xml_string(flat_scene_xml(placements, friction))
-
-
 def spawn_pose(world, design: RoverDesign, x: float = rp.SPAWN_X_M, y: float = 0.0) -> tuple[tuple[float, float, float], float]:
     r, half_w = design.wheel_radius_m, design.wheel_width_m / 2
     top = -np.inf
@@ -438,17 +368,3 @@ def spawn_pose(world, design: RoverDesign, x: float = rp.SPAWN_X_M, y: float = 0
             if abs(rock.x - (x + cx)) < r + reach and abs(rock.y - (y + cy)) < half_w + reach:
                 top = max(top, rock.z + rock.sz)
     return (x, y, top + rp.SPAWN_CLEARANCE_M), 0.0
-
-
-def build_model_with_rovers(world, placements: Sequence[RoverPlacement]):
-    import mujoco
-
-    import scene
-
-    parts = [rover_mjcf(pl.design, pl.prefix, pl.pos, pl.yaw) for pl in placements]
-    join = "\n".join
-    model = scene.build_model_from_world(
-        world, join(p.body for p in parts), join(p.actuator for p in parts), join(p.equality for p in parts)
-    )
-    model.opt.integrator = mujoco.mjtIntegrator.mjINT_IMPLICITFAST
-    return model

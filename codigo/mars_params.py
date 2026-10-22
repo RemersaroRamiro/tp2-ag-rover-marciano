@@ -17,7 +17,7 @@ Qué contiene
 
 Dónde encaja
     Etapa: simulación. No importa otros archivos del proyecto. Lo usan track_terrain, track_features,
-    track_rocks, track_sections, scene, headless, evaluate y rover_run.
+    track_rocks, track_sections, headless, evaluate y rover_run.
 
 Fuentes
     Valores medidos o publicados (los de las secciones de la pista vienen de la investigación T9):
@@ -53,9 +53,9 @@ Fuentes
     - DTM_LOWPASS_SIGMA_M = 4 (deducido de la resolución efectiva; los detalles más finos son en parte
       ruido), DTM_BORDER_SIGMA_M = 10 y ROUGHNESS_CUTOFF_M = 0.5.
     - ROCK_FRACTIONAL_AREA_K = 0.05: el k de Jezero no está publicado; los sitios de aterrizaje tienen 3-7 %.
-    - ROCK_EMBEDDED_FRACTION = 0.27, ROCK_D_MAX_M = 2 y MAX_ROCK_GEOMS = 6000 (presupuesto de MuJoCo: la
-      escena se dibuja a más de 45 fps); por eso las rocas más pequeñas que ROCK_D_MIN_LANE_M (dentro
-      del carril) o ROCK_D_MIN_OUTSIDE_M (fuera de él) no se modelan.
+    - ROCK_EMBEDDED_FRACTION = 0.27, ROCK_D_MAX_M = 2 y MAX_ROCK_GEOMS = 6000 (presupuesto de rocas del
+      modelo MuJoCo); por eso las rocas más pequeñas que ROCK_D_MIN_LANE_M (dentro del carril) o
+      ROCK_D_MIN_OUTSIDE_M (fuera de él) no se modelan.
     - ROCK_FRICTION = 0.7 (rueda contra roca tipo basalto), SPIN_FRICTION y ROLL_FRICTION.
     - RIPPLE_WAVELENGTH_M = 4: no se encontró un valor de Jezero; las ondulaciones de Hidden Valley, en
       Gale, miden 3-4 m (Bretzfelder 2021).
@@ -63,9 +63,9 @@ Fuentes
       de 30°; las pendientes típicas son de 5-15°.
     - Decisiones de diseño: SECTION_TRANSITION_M, SECTION_BOUNDARIES_M, ROCK_K_BEDROCK_FACTOR,
       ROCK_D_MIN_DENSE_M, RIPPLE_ASYMMETRY, RIPPLE_OBLIQUITY_DEG, RIPPLE_WARP_RAD, SAND_RIPPLE_FRACTION,
-      SAND_TINT_ALPHA, BEDROCK_PLATE_LENGTH_M, BEDROCK_LEDGE_EDGE_M, BEDROCK_PLATE_TILT_DEG,
-      BEDROCK_LEDGE_OBLIQUITY_DEG, CRATER_RIM_WIDTH_FRACTION, CRATER_CENTER_Y_M, CLIMB_TOP_EASE_M,
-      CLIMB_SCARP_WANDER_M y CLIMB_SCARP_BROADENING.
+      BEDROCK_PLATE_LENGTH_M, BEDROCK_LEDGE_EDGE_M, BEDROCK_PLATE_TILT_DEG, BEDROCK_LEDGE_OBLIQUITY_DEG,
+      CRATER_RIM_WIDTH_FRACTION, CRATER_CENTER_Y_M, CLIMB_TOP_EASE_M, CLIMB_SCARP_WANDER_M y
+      CLIMB_SCARP_BROADENING.
 """
 
 MARS_GRAVITY_M_S2 = 3.71
@@ -113,7 +113,6 @@ LANE_WIDTH_M = 20.0
 START_X_M = 3.0
 FINISH_MARGIN_M = 3.0
 SPAWN_CLEAR_X_M = 6.0
-MARKER_SPACING_M = 50.0
 
 SECTION_TRANSITION_M = 16.0
 SECTION_BOUNDARIES_M = (40.0, 100.0, 155.0, 210.0, 265.0, 305.0, 345.0)
@@ -131,7 +130,6 @@ RIPPLE_WARP_RAD = 0.7
 SOFT_SAND_FRICTION = 0.2
 SAND_RIPPLE_FRACTION = 0.4
 FRICTION_TILE_M = 4.0
-SAND_TINT_ALPHA = 0.5
 
 BEDROCK_STEP_M = 0.30
 BEDROCK_PLATE_LENGTH_M = (7.0, 13.0)

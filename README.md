@@ -51,12 +51,12 @@ El diseño de referencia, de escala similar al Perseverance, no llega a la meta 
 
 | Corrida | Comando |
 |---|---|
-| C1 | `uv run python codigo/evolve.py --preset normal --seed 1 --replay none --out runs/c1-base` |
-| C2 | `uv run python codigo/evolve.py --preset normal --seed 1 --replay none --selection roulette --out runs/c2-ruleta` |
-| C3 | `uv run python codigo/evolve.py --preset normal --seed 1 --replay none --crossover binomial --out runs/c3-binomial` |
-| C4 | `uv run python codigo/evolve.py --preset normal --seed 1 --replay none --no-adaptive-mutation --out runs/c4-sigma-fija` |
-| C5 | `uv run python codigo/evolve.py --preset normal --seed 1 --replay none --elite-count 0 --out runs/c5-sin-elite` |
-| Aleatoria | `uv run python codigo/evolve.py --preset normal --seed 1 --replay none --random-search --out runs/random-search` |
+| C1 | `uv run python codigo/evolve.py --preset normal --seed 1 --out runs/c1-base` |
+| C2 | `uv run python codigo/evolve.py --preset normal --seed 1 --selection roulette --out runs/c2-ruleta` |
+| C3 | `uv run python codigo/evolve.py --preset normal --seed 1 --crossover binomial --out runs/c3-binomial` |
+| C4 | `uv run python codigo/evolve.py --preset normal --seed 1 --no-adaptive-mutation --out runs/c4-sigma-fija` |
+| C5 | `uv run python codigo/evolve.py --preset normal --seed 1 --elite-count 0 --out runs/c5-sin-elite` |
+| Aleatoria | `uv run python codigo/evolve.py --preset normal --seed 1 --random-search --out runs/random-search` |
 
 Cada corrida del AG son 1800 simulaciones y tardó entre 39 y 48 minutos con 16 procesos en paralelo; la búsqueda
 aleatoria, unos 17 minutos. `uv run python codigo/evolve.py --help` lista todos los parámetros.
@@ -73,7 +73,7 @@ El Algoritmo Genético se lee en el notebook; `codigo/` es el simulador y el pro
 | Ciclo de generaciones | sección 4, "Ciclo de generaciones" | `ga.py` |
 | Corrida completa, validación en terrenos nuevos y criterio de éxito | sección 4, "Ejecución de la corrida" | `evolve.py` |
 | Búsqueda aleatoria (línea de base) | resultados en la sección 4 | `baselines.py` |
-| Simulación de cada rover (MuJoCo): pista, rocas, rover, controlador y energía | caja negra | `evaluate.py` y los módulos que importa (`track_*.py`, `mars_*.py`, `rover*.py`, `controller.py`, `energy.py`, `scene.py`, `headless.py`) |
+| Simulación de cada rover (MuJoCo, sin gráficos): pista, rocas, rover, controlador y energía | caja negra | `evaluate.py` y los módulos que importa (`headless.py`, `track_*.py`, `mars_params.py`, `rover*.py`, `controller.py`, `energy.py`) |
 | Gráficos | sección 5 | `plot_run.py` (los PNG de `logs-corridas/`) |
 
 La celda "Comprobación" de la sección 4 demuestra que el AG del notebook es el mismo que el de `codigo/ga.py`: con la
@@ -83,5 +83,5 @@ corridas.
 ## Créditos
 
 El relieve de la pista es un recorte del modelo digital de elevación HiRISE del sitio de aterrizaje del Mars 2020
-(USGS Astrogeology); ver `codigo/data/track/CREDITS.md`. Las texturas del terreno provienen de imágenes de la NASA;
-ver `codigo/assets/CREDITS.md`. Para la implementación se usó Claude Code (Anthropic) como asistente de programación.
+(USGS Astrogeology); ver `codigo/data/track/CREDITS.md`. Para la implementación se usó Claude Code (Anthropic) como
+asistente de programación.

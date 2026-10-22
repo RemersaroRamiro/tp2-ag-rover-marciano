@@ -20,14 +20,10 @@ Qué contiene
       terrenos nunca vistos. Una corrida tiene éxito si su mejor diseño es válido y llega a la meta en
       SUCCESS_MIN_FINISHES = 3 de SUCCESS_OF_SEEDS = 5 terrenos (entrega parcial, sección 6.3); con otra
       cantidad de terrenos se exige la misma proporción, redondeada hacia arriba.
-    - Grabación: REPLAY_HZ = 10 cuadros por segundo simulado; REPLAY_MAX_FRAMES = 6000 cuadros por
-      rover como máximo (un rover que llega a la meta necesita unos 5900, así que solo se reduce la
-      tasa de uno que avanza muy lento hasta el tiempo límite); REPLAY_BEST_K = 5 rovers por generación
-      en el modo de grabación "best".
 
 Dónde encaja
     Etapa: aptitud, corrida y resultados. No importa otros archivos del proyecto.
-    Lo usan fitness, evolve, seed_schedule y replay.
+    Lo usan fitness, evolve y seed_schedule.
 """
 
 from __future__ import annotations
@@ -41,7 +37,3 @@ VALIDATION_GENOMES = 3
 
 SUCCESS_MIN_FINISHES = 3
 SUCCESS_OF_SEEDS = 5
-
-REPLAY_HZ = 10.0
-REPLAY_MAX_FRAMES = 6000
-REPLAY_BEST_K = 5

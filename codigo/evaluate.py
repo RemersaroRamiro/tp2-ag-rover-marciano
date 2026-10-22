@@ -20,8 +20,8 @@ Cómo funciona
     la corrida termina. Cada simulación depende solo del genoma, la semilla y la configuración.
 
 Dónde encaja
-    Etapa: simulación. Llama a rover, headless, rover_run, scene, replay, genome_spec y a los archivos
-    de parámetros. Lo usa evolve.py; fitness.py convierte sus RunSummary en aptitud.
+    Etapa: simulación. Llama a rover, headless, rover_run, genome_spec y a los archivos de parámetros.
+    Lo usa evolve.py; fitness.py convierte sus RunSummary en aptitud.
 """
 
 from __future__ import annotations
@@ -48,9 +48,7 @@ import headless
 import mars_params as mp
 import rover
 import rover_params as rp
-import replay as replay_format
 import rover_run
-import scene
 
 TRAJECTORY_COLUMNS = rover_run.TRAJECTORY_COLUMNS
 PREFIX = "r0_"
@@ -78,7 +76,6 @@ class EvalConfig:
     cell_m: float = mp.TRACK_CELL_M
     spawn_x_m: float = rp.SPAWN_X_M
     rock_window_m: float | None = DEFAULT_ROCK_WINDOW_M
-    headless: bool = True
 
     def __post_init__(self):
         ratio = rp.CONTROL_DT_S / self.timestep_s if self.timestep_s > 0 else 0.0
@@ -126,16 +123,12 @@ class RunSummary:
     steps: int
     windows_used: int
     trajectory: np.ndarray = field(compare=False, repr=False)
-    replay: np.ndarray | None = field(default=None, compare=False, repr=False)
     wall_s: float = field(default=0.0, compare=False)
     build_s: float = field(default=0.0, compare=False)
     sim_s: float = field(default=0.0, compare=False)
 
     def same_result(self, other: "RunSummary") -> bool:
-        if (self.replay is None) != (other.replay is None):
-            return False
-        same_replay = self.replay is None or np.array_equal(self.replay, other.replay)
-        return self == other and np.array_equal(self.trajectory, other.trajectory) and same_replay
+        return self == other and np.array_equal(self.trajectory, other.trajectory)
 
 
 SHARED_TRACKS_KEPT = 2
@@ -143,10 +136,8 @@ _ANY_POPULATION = 1 << 30
 
 
 @lru_cache(maxsize=SHARED_TRACKS_KEPT)
-def _world(seed: int, cell_m: float, is_headless: bool):
-    if is_headless:
-        return headless.generate_headless_world(seed, cell_m=cell_m)
-    return scene.generate_track_world(seed, cell_m=cell_m)
+def _world(seed: int, cell_m: float):
+    return headless.generate_headless_world(seed, cell_m=cell_m)
 
 
 def save_shared_world(world, directory: str | Path, name: str | None = None) -> Path:
@@ -188,29 +179,17 @@ def _is_unstable(data, steps: int, timestep_s: float) -> bool:
     return data.time < (steps - 0.5) * timestep_s or not np.isfinite(data.qpos).all()
 
 
-def _replay_interval(replay_hz: float, timestep_s: float) -> int:
-    every = round(1.0 / (replay_hz * timestep_s)) if replay_hz > 0 else 0
-    if every < 1:
-        raise ValueError(f"replay_hz={replay_hz} must be positive and no faster than the physics step ({1.0 / timestep_s:g} Hz)")
-    return every
-
-
-def evaluate_one(genome, seed: int, config: EvalConfig | None = None, replay_hz: float | None = None, world=None) -> RunSummary:
+def evaluate_one(genome, seed: int, config: EvalConfig | None = None, world=None) -> RunSummary:
     config = config or EvalConfig()
     genome = _check_genome(genome)
-    replay_every = None if replay_hz is None else _replay_interval(replay_hz, config.timestep_s)
     t_start = time.perf_counter()
     design = rover.design_from_genome(genome)
     violations = tuple(rover.check_constraints(design))
-    world = world if world is not None else _world(seed, config.cell_m, config.headless)
+    world = world if world is not None else _world(seed, config.cell_m)
     pos, yaw = rover.spawn_pose(world, design, x=config.spawn_x_m)
-    windows = headless.RockWindows(config.rock_window_m) if config.headless and config.rock_window_m else None
+    windows = headless.RockWindows(config.rock_window_m) if config.rock_window_m else None
     zone = windows.index(pos[0]) if windows else 0
-    if config.headless:
-        model = headless.build_model(world, design, PREFIX, pos, yaw, config.timestep_s, windows.rock_range(zone) if windows else None)
-    else:
-        model = rover.build_model_with_rovers(world, [rover.RoverPlacement(design, PREFIX, pos, yaw)])
-        model.opt.timestep = config.timestep_s
+    model = headless.build_model(world, design, PREFIX, pos, yaw, config.timestep_s, windows.rock_range(zone) if windows else None)
     data = mujoco.MjData(model)
     limits = rover_run.RunLimits.on_track(
         timeout_s=config.max_sim_time_s, stuck_window_s=config.stuck_window_s, stuck_progress_m=config.stuck_progress_m
@@ -222,20 +201,6 @@ def evaluate_one(genome, seed: int, config: EvalConfig | None = None, replay_hz:
     steps, unstable, models_built = 0, False, 1
     chassis, spc = run.controller.chassis_body, config.steps_per_control
     check_every = round(1.0 / config.timestep_s)
-    frames: list[np.ndarray] = []
-    last_recorded_step = -1
-    if replay_every is not None:
-        qpos_index = replay_format.qpos_addresses(model, PREFIX)
-        n_free = replay_format.N_FREE
-
-        def record() -> None:
-            nonlocal last_recorded_step
-            last_recorded_step = steps
-            q = data.qpos[qpos_index]
-            if np.isfinite(q).all():
-                frames.append(np.concatenate(([data.time], q[:n_free], replay_format.wrap_angles(q[n_free:]))).astype(np.float32))
-
-        record()
     max_steps = math.ceil(config.max_sim_time_s / config.timestep_s) + 2 * config.steps_per_control
     while run.running and steps < max_steps:
         step(model, data)
@@ -248,13 +213,9 @@ def evaluate_one(genome, seed: int, config: EvalConfig | None = None, replay_hz:
             model = new_model
             run.controller.limit_torque(model)
             models_built += 1
-        if replay_every is not None and steps % replay_every == 0:
-            record()
         if steps % check_every == 0 and _is_unstable(data, steps, config.timestep_s):
             unstable = True
             break
-    if replay_every is not None and last_recorded_step != steps:
-        record()
     t_done = time.perf_counter()
 
     summary = run.summary()
@@ -269,7 +230,6 @@ def evaluate_one(genome, seed: int, config: EvalConfig | None = None, replay_hz:
         soc=summary["soc"], max_abs_y_m=summary["max_abs_y_m"], torque_limit_nm=summary["torque_limit_nm"],
         total_mass_kg=design.total_mass_kg, repairs=design.repairs, violations=violations, steps=steps, windows_used=models_built,
         trajectory=run.trajectory_array(),
-        replay=np.stack(frames) if frames else None,
         wall_s=t_done - t_start, build_s=t_built - t_start, sim_s=t_done - t_built,
     )
 
@@ -289,10 +249,10 @@ def _check_population(genomes) -> np.ndarray:
     return g
 
 
-def _evaluate_task(task: tuple[tuple[float, ...], int, EvalConfig, float | None, str | None]) -> RunSummary:
-    genome, seed, config, replay_hz, world_path = task
+def _evaluate_task(task: tuple[tuple[float, ...], int, EvalConfig, str | None]) -> RunSummary:
+    genome, seed, config, world_path = task
     world = _shared_world(world_path) if world_path is not None else None
-    return evaluate_one(np.array(genome), seed, config, replay_hz, world)
+    return evaluate_one(np.array(genome), seed, config, world)
 
 
 class Evaluator:
@@ -323,7 +283,7 @@ class Evaluator:
         return self._pool
 
     def _publish(self, seed: int, config: EvalConfig) -> str:
-        world = _world(seed, config.cell_m, config.headless)
+        world = _world(seed, config.cell_m)
         with self._lock:
             if self._dir is None:
                 self._dir = Path(tempfile.mkdtemp(prefix="rover3d-tracks-"))
@@ -331,8 +291,6 @@ class Evaluator:
         return str(save_shared_world(world, directory, f"world_{seed}_{config.cell_m:g}.pkl"))
 
     def _track(self, seed: int, config: EvalConfig) -> Future | None:
-        if not config.headless:
-            return None
         key = (seed, config.cell_m)
         with self._lock:
             if key in self._tracks:
@@ -359,42 +317,34 @@ class Evaluator:
                     self._room = max(self._room, keep)
             self._track(seed, config)
 
-    def evaluate(self, genomes, seed: int, config: EvalConfig | None = None, replay_hz: float | None = None) -> list[RunSummary]:
+    def evaluate(self, genomes, seed: int, config: EvalConfig | None = None) -> list[RunSummary]:
         config = config or EvalConfig()
         genomes = _check_population(genomes)
         if len(genomes) == 0:
             return []
-        if replay_hz is not None:
-            _replay_interval(replay_hz, config.timestep_s)
         pool = self._ensure_pool(len(genomes))
         if pool is None:
-            return [evaluate_one(g, seed, config, replay_hz) for g in genomes]
+            return [evaluate_one(g, seed, config) for g in genomes]
         track = self._track(seed, config)
         path = track.result() if track is not None else None
-        tasks = [(tuple(float(x) for x in g), seed, config, replay_hz, path) for g in genomes]
+        tasks = [(tuple(float(x) for x in g), seed, config, path) for g in genomes]
         return list(pool.map(_evaluate_task, tasks, chunksize=1))
 
-    def evaluate_seeds(self, genomes, seeds, config: EvalConfig | None = None, replay_hz=None) -> list[list[RunSummary]]:
+    def evaluate_seeds(self, genomes, seeds, config: EvalConfig | None = None) -> list[list[RunSummary]]:
         config = config or EvalConfig()
         genomes, seeds = _check_population(genomes), list(seeds)
-        rates = list(replay_hz) if isinstance(replay_hz, (list, tuple)) else [replay_hz] * len(seeds)
-        if len(rates) != len(seeds):
-            raise ValueError(f"replay_hz needs one rate per seed ({len(seeds)} seeds), got {len(rates)}")
-        for rate in rates:
-            if rate is not None:
-                _replay_interval(rate, config.timestep_s)
         if not seeds or len(genomes) == 0:
             return [[] for _ in seeds]
         pool = self._ensure_pool(len(genomes) * len(seeds))
         if pool is None:
-            return [[evaluate_one(g, seed, config, rate) for g in genomes] for seed, rate in zip(seeds, rates)]
+            return [[evaluate_one(g, seed, config) for g in genomes] for seed in seeds]
         with self._lock:
             previous = self._room
             self._room = max(previous, len(seeds))
         try:
             tracks = [self._track(seed, config) for seed in seeds]
             paths = [t.result() if t is not None else None for t in tracks]
-            tasks = [(tuple(float(x) for x in g), seed, config, rate, path) for seed, rate, path in zip(seeds, rates, paths) for g in genomes]
+            tasks = [(tuple(float(x) for x in g), seed, config, path) for seed, path in zip(seeds, paths) for g in genomes]
             flat = list(pool.map(_evaluate_task, tasks, chunksize=1))
         finally:
             with self._lock:
@@ -427,9 +377,8 @@ class Evaluator:
         self.close()
 
 
-def evaluate_population(genomes, seed: int, config: EvalConfig | None = None, workers: int | None = None,
-                        replay_hz: float | None = None) -> list[RunSummary]:
+def evaluate_population(genomes, seed: int, config: EvalConfig | None = None, workers: int | None = None) -> list[RunSummary]:
     config = config or EvalConfig()
     genomes = _check_population(genomes)
     with Evaluator(workers, warm=(seed, config)) as evaluator:
-        return evaluator.evaluate(genomes, seed, config, replay_hz)
+        return evaluator.evaluate(genomes, seed, config)
