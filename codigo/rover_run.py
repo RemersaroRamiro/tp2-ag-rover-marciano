@@ -9,7 +9,6 @@ Qué contiene
     - RunLimits: los límites que terminan una corrida (sus valores están en rover_params).
     - RunTracker: el estado, el avance y la trayectoria de una corrida; no usa MuJoCo.
     - RoverRun: une un rover del modelo con su controlador, su batería y su RunTracker.
-    - simulate: avanza la simulación hasta que ningún rover sigue en marcha.
 
 Cómo funciona
     En cada paso de control se revisa, en este orden: llegó a la meta, batería agotada, más de 10 m
@@ -100,10 +99,6 @@ class RunTracker:
     @property
     def section_reached(self) -> str | None:
         return None if self._section_at is None else self._section_at(self.max_x_m).name
-
-    @property
-    def section_now(self) -> str | None:
-        return None if self._section_at is None else self._section_at(self.x_m).name
 
     def update(self, s: RunSample) -> None:
         if self.status != "running":
@@ -232,12 +227,3 @@ class RoverRun:
             "usable_wh": b.usable_wh, "usable_remaining_wh": b.usable_remaining_wh, "soc": b.soc,
             "max_abs_y_m": self.max_abs_y_m, "torque_limit_nm": self.controller.torque_limit_nm,
         }
-
-
-def simulate(model, data, runs: list[RoverRun], seconds: float) -> None:
-    import mujoco
-
-    while data.time < seconds - 1e-9 and any(r.running for r in runs):
-        mujoco.mj_step(model, data)
-        for r in runs:
-            r.update(data)

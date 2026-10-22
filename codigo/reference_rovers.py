@@ -1,15 +1,13 @@
 """
-reference_rovers.py: rovers de referencia con valores físicos conocidos.
+reference_rovers.py: el rover de referencia, con valores físicos conocidos.
 
 Para qué existe
     Para saber si un diseño evolucionado es bueno hace falta compararlo con uno conocido. Este archivo
-    guarda esos diseños de referencia, escritos como el valor físico de cada gen.
+    guarda ese diseño de referencia, escrito como el valor físico de cada gen.
 
 Qué contiene
     - PERSEVERANCE_LIKE: un rover del tamaño y la masa de Perseverance (~1 t, ruedas de 0.525 m). En el
       terreno de semilla 0 queda atascado detrás de una roca de ~0.5 m, cerca de x = 38 m.
-    - FINISHER: el mismo rover con tres genes cambiados (ruedas de 0.7 m, 1 m/s y sin freno en
-      pendientes); recorre toda la pista en unos 500 s simulados.
     - genome: convierte esos valores físicos en un genoma en [0, 1].
 
 Dónde encaja
@@ -31,9 +29,6 @@ PERSEVERANCE_LIKE: dict[str, float] = {
     "motor_peak_torque_nm": 120.0, "battery_energy_wh": 2000.0,
     "target_speed_mps": 0.5, "torque_limit_fraction": 0.8, "slope_brake": 0.5,
 }
-
-FINISHER: dict[str, float] = {**PERSEVERANCE_LIKE, "wheel_diameter_m": 0.7, "target_speed_mps": 1.0, "slope_brake": 0.0}
-
 
 def genome(values: dict[str, float]) -> np.ndarray:
     return genome_spec.encode(values)

@@ -55,16 +55,6 @@ TIMESTEP_S = 0.002
 GROUND_PRIORITY = 1
 
 
-def design_reach_bound_m(design: rover.RoverDesign) -> float:
-    top = design.chassis_bottom_z_m + design.chassis_height_m
-    chassis = math.sqrt((design.chassis_length_m / 2) ** 2 + (design.chassis_width_m / 2) ** 2 + top**2)
-    bogie_arm = math.hypot(design.bogie_length_m / 2, design.bogie_pivot_l[2] - design.wheel_radius_m)
-    chain = max(design.front_arm_m, design.rear_arm_m + bogie_arm)
-    pivot = math.dist(design.rocker_pivot_l, (0.0, 0.0, 0.0))
-    wheel = math.hypot(design.wheel_radius_m, design.wheel_width_m / 2)
-    return max(chassis, pivot + chain + wheel)
-
-
 @lru_cache(maxsize=1)
 def load_strip() -> tt.Strip:
     return tt.load_strip()
@@ -104,10 +94,6 @@ class HeadlessWorld:
 
     def section_at(self, x: float) -> ts.Section:
         return ts.section_at(x, self.sections)
-
-    def rocks_between(self, x_lo: float, x_hi: float) -> list[tr.Rock]:
-        keep = (self.rock_x_hi >= x_lo) & (self.rock_x_lo <= x_hi)
-        return [r for r, k in zip(self.rocks, keep) if k]
 
     def rock_xml(self, rock_range: tuple[float, float] | None = None) -> str:
         if rock_range is None:

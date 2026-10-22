@@ -127,9 +127,6 @@ class RunSummary:
     build_s: float = field(default=0.0, compare=False)
     sim_s: float = field(default=0.0, compare=False)
 
-    def same_result(self, other: "RunSummary") -> bool:
-        return self == other and np.array_equal(self.trajectory, other.trajectory)
-
 
 SHARED_TRACKS_KEPT = 2
 _ANY_POPULATION = 1 << 30
@@ -265,10 +262,6 @@ class Evaluator:
         self._tracks: OrderedDict[tuple, Future] = OrderedDict()
         self._room = SHARED_TRACKS_KEPT
         self._dir: Path | None = None
-
-    @property
-    def shared_dir(self) -> Path | None:
-        return self._dir
 
     def _ensure_pool(self, population: int) -> ProcessPoolExecutor | None:
         if resolve_workers(self._requested, population) == 1:

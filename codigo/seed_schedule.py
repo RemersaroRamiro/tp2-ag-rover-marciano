@@ -9,7 +9,7 @@ Para qué existe
 Qué contiene
     - SeedSchedule: las semillas de entrenamiento de cada generación y las semillas de validación.
     - SeedSchedule.for_run: arma las semillas de una corrida.
-    - seeds_for_generation: las semillas en las que se evalúa una generación (primero, la que se graba).
+    - seeds_for_generation: las semillas en las que se evalúa una generación.
 
 Cómo funciona
     La semilla solo cambia las rocas y la rugosidad fina; el relieve y las secciones son fijos. Las
@@ -74,10 +74,6 @@ class SeedSchedule:
     def _check(self, generation: int) -> None:
         if not 0 <= generation < len(self.training):
             raise IndexError(f"generation {generation} is outside this schedule ({len(self.training)} generations)")
-
-    def for_generation(self, generation: int) -> int:
-        self._check(generation)
-        return self.training[generation]
 
     def seeds_for_generation(self, generation: int) -> tuple[int, ...]:
         self._check(generation)

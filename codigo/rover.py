@@ -43,11 +43,6 @@ class MassProps:
     com: tuple[float, float, float]
     inertia: tuple[float, float, float, float, float, float]
 
-    @property
-    def inertia_matrix(self) -> np.ndarray:
-        xx, yy, zz, xy, xz, yz = self.inertia
-        return np.array([[xx, xy, xz], [xy, yy, yz], [xz, yz, zz]])
-
 
 def _pack(matrix: np.ndarray) -> tuple[float, float, float, float, float, float]:
     return (
@@ -121,10 +116,6 @@ class RoverDesign:
     tipover_longitudinal_deg: float
     tipover_lateral_deg: float
     envelope_m: tuple[float, float, float]
-
-    @property
-    def wheel_diameter_m(self) -> float:
-        return 2 * self.wheel_radius_m
 
 
 def static_tipover_angles(com, x_front: float, x_rear: float, y_half: float) -> tuple[float, float]:

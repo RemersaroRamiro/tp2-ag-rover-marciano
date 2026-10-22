@@ -184,27 +184,10 @@ class TrackTerrain:
     features: np.ndarray | None = None
     sections: tuple[ts.Section, ...] = ()
 
-    @property
-    def x_axis(self) -> np.ndarray:
-        return np.linspace(self.x_min, self.x_max, self.heights.shape[1])
-
-    @property
-    def y_axis(self) -> np.ndarray:
-        return np.linspace(self.y_min, self.y_max, self.heights.shape[0])
-
     def sample(self, x, y):
         n_rows, n_cols = self.heights.shape
         return _bilinear_on_axes(
             self.heights, self.x_min, self.y_min,
-            (self.x_max - self.x_min) / (n_cols - 1), (self.y_max - self.y_min) / (n_rows - 1), x, y,
-        )
-
-    def sample_features(self, x, y):
-        if self.features is None:
-            return np.zeros(np.broadcast(np.asarray(x, dtype=float), np.asarray(y, dtype=float)).shape)[()]
-        n_rows, n_cols = self.features.shape
-        return _bilinear_on_axes(
-            self.features, self.x_min, self.y_min,
             (self.x_max - self.x_min) / (n_cols - 1), (self.y_max - self.y_min) / (n_rows - 1), x, y,
         )
 
