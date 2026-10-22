@@ -1,39 +1,26 @@
-"""Replay data of an evolution run: what is recorded per rover, how it is stored, and how to read it back.
+"""
+replay.py: el formato y los archivos de las grabaciones de cada generación.
 
-One rover's replay is a float32 array with a row per frame and the ``COLUMNS`` below: the simulated time, the chassis
-free joint (position ``x y z`` and unit quaternion ``qw qx qy qz``, world frame) and every other joint of the rover (the
-two rockers, the two bogies, the six wheel spin angles, in radians). That is enough to redraw the WHOLE rover later:
-set ``data.qpos[qpos_addresses(model, prefix)] = frame[1:]`` on a model built from the rover's design, then
-``mj_forward`` (the wheel angles are wrapped to [-pi, pi), which a rotating wheel cannot tell apart from the unwrapped
-angle). ``rocker_r`` and ``rocker_l`` are always opposite (the differential bar); both are kept so a viewer need not know.
+Para qué existe
+    Permite volver a ver cómo se movió cada rover después de una corrida, sin simular de nuevo.
+    Este archivo define qué se graba, cómo se comprime y cómo se vuelve a leer.
 
-The recording itself happens inside ``evaluate.evaluate_one`` (``replay_hz``); this module owns the layout and the
-files of one generation, ``<run dir>/replay/gen_0003.npz`` + ``gen_0003.json``:
+Qué contiene
+    - COLUMNS: lo que se guarda en cada cuadro (tiempo, posición y orientación del chasis y el ángulo
+      de cada articulación).
+    - ReplayPolicy: decide qué rovers se graban (todos, los mejores o ninguno) y en qué generaciones.
+    - write_generation: guarda replay/gen_NNNN.npz (los cuadros) y gen_NNNN.json (genoma, diseño y
+      resultados de cada rover).
+    - load_generation: vuelve a leer una generación grabada.
 
-* ``.npz`` (``np.savez_compressed``): ``frames_q`` (F, 18) integers, the frames of every recorded rover one after the
-  other, and ``offsets`` (N+1,) so that rover ``i`` owns rows ``offsets[i]:offsets[i+1]``; ``frame_step`` (N,) is
-  the thinning factor of rover ``i`` (1 = the full ``hz`` rate); ``recorded`` (N,) bool; ``genomes`` (N, L) and
-  ``fitness`` (N,) in population order; ``terrain_seed``, ``terrain_seeds``, ``generation``, ``hz``, ``columns`` and ``scales``.
-  ``load_generation`` decodes ``frames_q`` back to float32 ``frames`` (see "Storage" below), so readers never see it.
-* ``.json``: per rover its index, rank (0 = best), genome, decoded gene values, decoded design (geometry, masses,
-  derived metrics: enough to build the rover again), ``RunSummary`` fields (no arrays) and fitness with its details.
+Cómo funciona
+    Solo se graban cuadros en el primer terreno de cada generación; de los demás se guarda el resumen.
+    Cada valor se redondea a un paso fijo (1 ms, 1 mm, 1 mrad en las articulaciones) y se guarda como
+    diferencia con el cuadro anterior, lo que comprime unas 4 veces mejor sin cambios visibles.
 
-Several terrain seeds per generation. A generation is scored on ``N`` terrains (``terrain_seeds``, the first one is
-``terrain_seed``) but only the FIRST is recorded as frames: the frames are what the replay viewer draws, and they
-are the bulk of the storage, so the file of a generation stays the size it had with one seed (a generation's rovers
-are replayed on the first terrain). The other seeds are kept as summaries only, in each rover's ``other_seeds``
-(``seed`` and the ``RunSummary`` fields without arrays: distance, status, section, time, energy ...), and the score
-(``fitness`` / ``rank``) is the one over all seeds, so a viewer can say how far each rover got on each terrain. Frames
-on the other seeds would multiply the size by ``N``; ``evaluate.Evaluator.evaluate_seeds`` can record them
-(``replay_hz``) if a later task needs them.
-
-``ReplayPolicy`` decides what is recorded; ``load_generation`` reads a generation back for the replay viewer.
-
-Storage. Float32 frames barely compress (1.06x measured: the low mantissa bits are noise), and 50 rovers x 6000 frames
-(``REPLAY_MAX_FRAMES``, the most a rover keeps) would be 21.6 MB per generation. So each column is rounded to a fixed step (``SCALES``: 1 ms, 1 mm, 0.1 mrad of
-quaternion, 1 mrad of joint angle: far below anything visible) and stored as the difference from the previous frame
-of the same rover, which are small integers that compress 4x better (int16 when they fit, else int32). The error of
-a decoded value is at most half a step. Decoding is a cumulative sum per rover.
+Dónde encaja
+    Etapa: resultados. Usa ga, genome_spec, rover y evolution_params. Lo usan evolve.py (que graba
+    cada generación), evaluate.py y baselines.py.
 """
 
 from __future__ import annotations
@@ -52,12 +39,11 @@ import rover
 
 JOINTS = ("rocker_l", "rocker_r", "bogie_l", "bogie_r", *(f"wheel_{w}" for w in rover.WHEEL_IDS))
 COLUMNS = ("t", "x", "y", "z", "qw", "qx", "qy", "qz", *JOINTS)
-N_FREE = 7  # qpos entries of a free joint: position + quaternion
-SCALES = np.array([1e-3, 1e-3, 1e-3, 1e-3, *([1e-4] * 4), *([1e-3] * len(JOINTS))])  # rounding step of every column
+N_FREE = 7
+SCALES = np.array([1e-3, 1e-3, 1e-3, 1e-3, *([1e-4] * 4), *([1e-3] * len(JOINTS))])
 
 
 def qpos_addresses(model, prefix: str) -> np.ndarray:
-    """``model.qpos`` indices of a rover's free joint (7 consecutive entries) followed by ``JOINTS``, in ``COLUMNS[1:]`` order."""
     import mujoco
 
     def address(name: str) -> int:
@@ -71,24 +57,11 @@ def qpos_addresses(model, prefix: str) -> np.ndarray:
 
 
 def wrap_angles(angles: np.ndarray) -> np.ndarray:
-    """Angles folded into [-pi, pi)."""
     return (angles + np.pi) % (2.0 * np.pi) - np.pi
-
-
-# -- what to record ------------------------------------------------------------------------------------------------
 
 
 @dataclass(frozen=True)
 class ReplayPolicy:
-    """What the evolution loop keeps for replay.
-
-    * ``mode``: ``"all"`` (every rover), ``"best"`` (only the ``best_k`` fittest of each generation) or ``"none"``.
-    * ``every``: only generations 0, ``every``, 2 * ``every`` ... and the last one keep their frames; the other
-      generations still write their (small) descriptions.
-    * ``hz`` / ``max_frames``: frames per simulated second, and the most frames one rover may keep (longer runs are
-      thinned by a whole factor, see ``thin``): this bounds the size of a generation.
-    """
-
     mode: str = "all"
     every: int = 1
     best_k: int = params.REPLAY_BEST_K
@@ -113,7 +86,6 @@ class ReplayPolicy:
         return self.wants_frames and (generation % self.every == 0 or generation == generations - 1)
 
     def selected(self, fitness: np.ndarray) -> np.ndarray:
-        """Indices of the rovers whose frames are kept, fittest first (a failed evaluation counts as the worst)."""
         if self.mode == "none":
             return np.zeros(0, dtype=int)
         order = _ranking(fitness)
@@ -121,13 +93,10 @@ class ReplayPolicy:
 
 
 def _ranking(fitness: np.ndarray) -> np.ndarray:
-    """Indices from the fittest to the least fit; ties keep population order, failed evaluations come last."""
     return np.argsort(-np.where(np.isfinite(fitness), fitness, -np.inf), kind="stable")
 
 
 def thin(frames: np.ndarray, max_frames: int) -> tuple[np.ndarray, int]:
-    """``frames`` keeping every ``step``-th row, the smallest whole ``step`` that leaves at most ``max_frames`` rows;
-    the last row (the final state) is always kept. Returns ``(rows, step)``."""
     step = max(1, -(-len(frames) // max_frames))
     if step == 1:
         return frames, 1
@@ -140,12 +109,7 @@ def thin(frames: np.ndarray, max_frames: int) -> tuple[np.ndarray, int]:
     return frames[index], step
 
 
-# -- writing and reading one generation ----------------------------------------------------------------------------
-
-
 def encode_frames(frames: np.ndarray, offsets: np.ndarray) -> np.ndarray:
-    """Quantised, delta-coded form of ``frames`` (rows of ``COLUMNS``; rover ``i`` = rows ``offsets[i]:offsets[i+1]``):
-    the first row of each rover is absolute, the others are differences from the row before."""
     q = np.round(frames.astype(np.float64) / SCALES).astype(np.int64)
     out = np.empty_like(q)
     for lo, hi in zip(offsets[:-1], offsets[1:]):
@@ -157,7 +121,6 @@ def encode_frames(frames: np.ndarray, offsets: np.ndarray) -> np.ndarray:
 
 
 def decode_frames(coded: np.ndarray, offsets: np.ndarray, scales: np.ndarray = SCALES) -> np.ndarray:
-    """Inverse of ``encode_frames``: float32 frames, each value within half a step of the recorded one."""
     out = np.empty(coded.shape, dtype=np.float32)
     for lo, hi in zip(offsets[:-1], offsets[1:]):
         if hi > lo:
@@ -167,7 +130,7 @@ def decode_frames(coded: np.ndarray, offsets: np.ndarray, scales: np.ndarray = S
 
 def _design_dict(genome: np.ndarray) -> dict:
     design = dataclasses.asdict(rover.design_from_genome(genome))
-    design.pop("bodies")  # per-body mass properties: derivable, and bulky
+    design.pop("bodies")
     return design
 
 
@@ -185,11 +148,6 @@ def generation_paths(directory: str | Path, generation: int) -> tuple[Path, Path
 
 def write_generation(directory: str | Path, generation: int, terrain_seed: int, genomes: np.ndarray, summaries,
                      evaluations, policy: ReplayPolicy, generations: int | None = None, other_seeds=()) -> Path:
-    """Write the files of one generation under ``<directory>/replay/``; returns the ``.npz`` path.
-
-    ``summaries`` are the runs on ``terrain_seed`` (the only ones whose frames are stored); ``other_seeds`` is a list of
-    ``(seed, summaries)`` for the generation's other terrain seeds, one summary per rover, described in the JSON only.
-    ``generations`` (the run's total) only matters for ``policy.every``: the last generation is always recorded."""
     genomes = np.asarray(genomes, dtype=float)
     other_seeds = [(int(seed), list(runs)) for seed, runs in other_seeds]
     for seed, runs in other_seeds:
@@ -232,8 +190,8 @@ def write_generation(directory: str | Path, generation: int, terrain_seed: int, 
 @dataclass(frozen=True)
 class GenerationReplay:
     generation: int
-    terrain_seed: int  # the terrain of the frames (the first of ``terrain_seeds``)
-    terrain_seeds: tuple[int, ...]  # every terrain the generation was scored on
+    terrain_seed: int
+    terrain_seeds: tuple[int, ...]
     hz: float
     genomes: np.ndarray
     fitness: np.ndarray
@@ -248,12 +206,10 @@ class GenerationReplay:
         return len(self.genomes)
 
     def frames_of(self, i: int) -> np.ndarray:
-        """The (F, 18) frames of rover ``i`` (``COLUMNS``); no rows when it was not recorded."""
         return self.frames[self.offsets[i]: self.offsets[i + 1]]
 
 
 def load_generation(directory: str | Path, generation: int) -> GenerationReplay:
-    """Read generation ``generation`` from a run directory (or its ``replay`` folder)."""
     npz_path, json_path = generation_paths(directory, generation)
     if not npz_path.exists():
         raise FileNotFoundError(f"no replay for generation {generation} in {npz_path.parent}")

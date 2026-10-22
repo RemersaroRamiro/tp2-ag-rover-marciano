@@ -1,32 +1,28 @@
-"""Terrain of the Jezero track: a real HiRISE DTM strip, low-passed, plus calibrated fractal roughness.
+"""
+track_terrain.py: el terreno de la pista de Jezero, construido a partir de un modelo de elevación real.
 
-Pure numpy, no MuJoCo import, deterministic per seed. The seed only drives the synthetic parts
-(roughness, far backdrop relief, rocks); the real relief of the DTM never changes.
+Para qué existe
+    La pista se apoya en una franja real del cráter Jezero (un DTM de HiRISE). Este archivo carga esa
+    franja, le agrega la rugosidad fina que el DTM no resuelve y el relieve de cada sección, y produce
+    los mapas de alturas que usan la física y la escena.
 
-Coordinates (true ground meters, z up)
---------------------------------------
-* x runs along the track, from 0 at the strip's west edge to ``length_m`` (~379.5 m) at its east
-  edge. Pixels of the DTM are not square on the ground: an x pixel is 0.9486 m, a y pixel 1 m,
-  so sizes always come from the provenance JSON, never from the pixel counts.
-* y runs across the track, 0 on the strip's centre row (the 2D demo's ``jezero_floor`` line),
-  +y = north, ``+-width_m / 2`` at the strip's borders.
-* z is relative to the spawn point: the terrain is exactly 0 at ``(START_X_M, 0)``.
-* ``heights[row, col]``: rows run along +y, columns along +x (the memory layout of a MuJoCo hfield).
+Qué contiene
+    - load_strip: carga la franja real (data/track/) y sus datos de origen.
+    - generate_track_heightmap: el mapa de alturas de la pista con sus márgenes (TrackTerrain).
+    - generate_far_terrain: el terreno lejano, que continúa el mundo sin escalones.
+    - make_visual_terrains, plan_markers y plan_sand_decals: versiones más livianas para dibujar,
+      postes de distancia y el tinte de la arena (solo visual).
+    - plan_friction_tiles: corta el terreno de colisión en franjas para variar la fricción en la arena.
 
-Realism pipeline
-----------------
-1. The DTM's effective horizontal resolution is ~10-20 px, so 1 m-scale content is partly noise:
-   keep only the relief a Gaussian low-pass (sigma 4 m) leaves.
-2. Add synthetic fractal roughness (Hurst 0.7, rms slope 2.4 degrees at a 1 m baseline) only at the
-   scales the low-pass removed (its spectrum is the complement of the low-pass).
-3. The heightfield extends ``TERRAIN_MARGIN_M`` (30 m) beyond the strip on every side. The roughness
-   and the DTM detail are at full strength up to and across the strip border and fade to a smooth
-   copy of the DTM only over that margin, so the strip has no visible border; the heightfield's own
-   border meets a coarse far-field heightfield exactly, without a seam.
-4. The mixed track: the synthetic features of the named sections (``track_features``: ripples,
-   ledges, cross slope, crater, climb) are added on top, with the same margin fade, so the real DTM
-   stays the base relief everywhere. ``plan_friction_tiles`` splits the collision terrain along x so
-   that each tile can carry its own friction (soft sand); ``plan_sand_decals`` plans the visual tint.
+Cómo funciona
+    1. Se suaviza el DTM (filtro gaussiano de 4 m), porque su detalle de 1 m es en parte ruido.
+    2. Se agrega rugosidad fractal (Hurst 0.7, pendiente rms de 2.4° a 1 m) solo en las escalas quitadas.
+    3. Se suman las formas de cada sección (track_features). El relieve real es el mismo para todas las
+       semillas; la semilla solo cambia la rugosidad, el relieve lejano y las rocas.
+
+Dónde encaja
+    Etapa: simulación (pista). Usa track_features, track_sections y mars_params.
+    Lo usan scene, headless, track_rocks y rover_run.
 """
 
 from __future__ import annotations
@@ -48,56 +44,36 @@ STRIP_STEM = "jezero_floor_strip"
 _STREAM_ROUGHNESS = 101
 _STREAM_FAR = 102
 
-FAR_CELL_M = 3.8  # far-grid cell size; the terrain's border falls exactly on far-grid nodes
-FAR_DEFAULT_PAD_CELLS = 300  # far cells beyond each side of the strip (~1.1 km)
-FAR_RELAX_M = 300.0  # the DTM extension relaxes to spawn level over this distance
+FAR_CELL_M = 3.8
+FAR_DEFAULT_PAD_CELLS = 300
+FAR_RELAX_M = 300.0
 FAR_RELIEF_AMPLITUDE_M = 1.8
 FAR_RELIEF_FADE_IN_M = 150.0
-FAR_HOLE_DEPTH_M = 4.0  # far surface sinks this deep under the strip (hidden beneath it)
+FAR_HOLE_DEPTH_M = 4.0
 FAR_HOLE_RAMP_M = 10.0
 
-# Visual copies (see ``make_visual_terrains``): the drawn ground is a decimated version of the
-# physical one. Decimation keeps every n-th node, n being a divisor of the cell counts.
-# MuJoCo shades a heightfield flat, one tone per cell, so cells of 0.5 m facet the 4 m ripples and the
-# crater walls into visible blocks. The drawn terrain is therefore a grid of patches, each with its own
-# cell size: the lane band (|y| <= ~20 m) over the stretch with relief (ripples .. crater) keeps every
-# column (0.25 m along x); the rest of the lane band keeps every 3rd (0.75 m); the flanks beyond the lane
-# band keep every 6th row (1.5 m across). Neighbouring patches share whole rows / columns of nodes and
-# the heights on them, so the surface is continuous.
-VISUAL_TERRAIN_MAX_DECIMATION = (3, 3)  # coarse (x, y): outside the relief zone, and the lane band rows
-VISUAL_FLANK_MAX_DECIMATION_Y = 6  # rows of the flanks beyond the lane band
-VISUAL_LANE_BAND_HALF_M = 20.0  # half width of the finely drawn band (snapped outwards to the texture period)
-VISUAL_FINE_SECTIONS = ("ripples", "soft_sand", "bedrock", "cross_slope", "crater")  # drawn with every column
-# Every patch maps the ground texture from its own west / south edge, which is seamless only where that edge
-# lies a whole number of texture periods from the terrain's border: scene.py's texture period, in x
-# 10 tiles x 5 m, in y 5 tiles x 5 m x tile aspect (a test keeps them equal).
+VISUAL_TERRAIN_MAX_DECIMATION = (3, 3)
+VISUAL_FLANK_MAX_DECIMATION_Y = 6
+VISUAL_LANE_BAND_HALF_M = 20.0
+VISUAL_FINE_SECTIONS = ("ripples", "soft_sand", "bedrock", "cross_slope", "crater")
 VISUAL_ALIGN_X_M = 50.0
 VISUAL_ALIGN_Y_M = 5 * 5.0 * (224 / 416)
-VISUAL_FAR_MAX_DECIMATION = 4  # ~15 m cells instead of 3.8 m; the backdrop is hidden by fog
-VISUAL_SEAM_BAND_M = 15.0  # the visual terrain blends into the coarse visual far surface over this band
+VISUAL_FAR_MAX_DECIMATION = 4
+VISUAL_SEAM_BAND_M = 15.0
 
 MARKER_LANE_MARGIN_M = 0.5
 START_POST_HEIGHT_M = 0.30
 DISTANCE_POST_HEIGHT_M = 1.2
-SECTION_POST_HEIGHT_M = 0.8  # the stake pairs at section starts: shorter than the 50 m posts, subtle
+SECTION_POST_HEIGHT_M = 0.8
 
-# Soft-sand tint: translucent layers stacked over the visual terrain (MuJoCo ignores per-pixel texture
-# alpha, so the blend is a staircase of uniform layers). A layer covers the x extent where the sand
-# weight is at least one of these levels and the |y| extent below one of these half widths; the
-# stacked opacity is the product of an along-track and an across-track staircase.
 SAND_DECAL_X_LEVELS = (0.1, 0.35, 0.6, 0.85)
 SAND_DECAL_Y_HALF_WIDTHS_M = (12.0, 18.0, 24.0)
 
 
-# -- DTM strip -----------------------------------------------------------------------------------
-
-
 @dataclass(frozen=True)
 class Strip:
-    """The real DTM strip: ``elevation[row, col]`` in meters (row 0 = south, col 0 = west)."""
-
     elevation: np.ndarray
-    px_x_m: float  # true ground size of one pixel along x
+    px_x_m: float
     px_y_m: float
     center_row: int
     provenance: dict
@@ -120,7 +96,6 @@ class Strip:
 
 
 def load_strip(directory: Path = DATA_DIR) -> Strip:
-    """Load the committed strip and its provenance (true-meter pixel sizes come from the JSON)."""
     elevation = np.load(directory / f"{STRIP_STEM}.npy")
     info = json.loads((directory / f"{STRIP_STEM}.json").read_text(encoding="utf-8"))
     assert elevation.shape == (info["shape"]["rows_y"], info["shape"]["cols_x"])
@@ -144,7 +119,6 @@ def _gaussian_filter_axis(a: np.ndarray, sigma_px: float, axis: int) -> np.ndarr
 
 
 def lowpass_dtm(strip: Strip, sigma_m: float = mp.DTM_LOWPASS_SIGMA_M) -> np.ndarray:
-    """Gaussian low-pass of the DTM with ``sigma_m`` in true meters (borders replicate)."""
     field = strip.elevation.astype(np.float64)
     field = _gaussian_filter_axis(field, sigma_m / strip.px_y_m, axis=0)
     return _gaussian_filter_axis(field, sigma_m / strip.px_x_m, axis=1)
@@ -161,14 +135,10 @@ def _bilinear(field: np.ndarray, row: np.ndarray, col: np.ndarray) -> np.ndarray
 
 
 def sample_strip(strip: Strip, field: np.ndarray, x, y):
-    """Bilinear sample of a strip-shaped ``field`` at true-meter (x, y); queries clamp to the border."""
     x, y = np.broadcast_arrays(np.asarray(x, dtype=float), np.asarray(y, dtype=float))
     col = np.clip(x / strip.px_x_m - 0.5, 0, strip.cols - 1)
     row = np.clip((y + strip.width_m / 2) / strip.px_y_m - 0.5, 0, strip.rows - 1)
     return _bilinear(field, row, col)[()]
-
-
-# -- calibrated fractal roughness ------------------------------------------------------------------
 
 
 def _rng(seed: int, stream: int) -> np.random.Generator:
@@ -188,8 +158,6 @@ def _wavenumber(shape: tuple[int, int], cell_x: float, cell_y: float) -> np.ndar
 
 
 def _roughness_amplitude(shape: tuple[int, int], cell_x: float, cell_y: float) -> np.ndarray:
-    """Amplitude spectrum of a 2-D fractional Brownian surface, ``k**-(H+1)``, high-passed with the
-    complement of the DTM low-pass so it only fills the scales the low-pass removed."""
     k = _wavenumber(shape, cell_x, cell_y)
     with np.errstate(divide="ignore"):
         amplitude = np.where(k > 0, k ** -(mp.HURST + 1.0), 0.0)
@@ -198,10 +166,6 @@ def _roughness_amplitude(shape: tuple[int, int], cell_x: float, cell_y: float) -
 
 
 def _expected_rms_lag_difference(amplitude: np.ndarray, lag_x: int, lag_y: int) -> float:
-    """Expected rms of ``f[n + lag] - f[n]`` for white noise shaped by ``amplitude`` (no sampling).
-
-    For ``f = ifft2(fft2(white) * A)``: Var = (1 / N) * sum_k |A_k|^2 * 2 * (1 - cos(2 pi k lag / n)).
-    """
     ny, nx = amplitude.shape
     power = amplitude**2
     kx = np.fft.fftfreq(nx) * nx
@@ -212,12 +176,6 @@ def _expected_rms_lag_difference(amplitude: np.ndarray, lag_x: int, lag_y: int) 
 
 
 def synthetic_roughness(shape: tuple[int, int], cell_m: float, seed: int, cell_y_m: float | None = None) -> np.ndarray:
-    """Fractal roughness on a ``shape = (rows, cols)`` grid, in meters, zero mean.
-
-    Calibrated analytically (independent of the seed): the expected rms height difference over a
-    1 m baseline equals ``tan(rms slope) * 1 m**H`` with the slope and H from ``mars_params``, i.e.
-    rms dh(L) ~ 0.042 * L**0.7 m.
-    """
     cell_y = cell_m if cell_y_m is None else cell_y_m
     amplitude = _roughness_amplitude(shape, cell_m, cell_y)
     lag_x, lag_y = max(1, round(1.0 / cell_m)), max(1, round(1.0 / cell_y))
@@ -237,16 +195,12 @@ def _spectral_field(
     wavelength_max_m: float,
     exponent: float,
 ) -> np.ndarray:
-    """Band-limited fractal noise with zero mean and unit std on a (rows, cols) grid of rectangular cells."""
     k = _wavenumber(shape, cell_x, cell_y)
     with np.errstate(divide="ignore"):
         shaping = np.where(k > 0, k**-exponent, 0.0)
     shaping = shaping * np.exp(-((k * wavelength_min_m) ** 2)) * (1.0 - np.exp(-((k * wavelength_max_m) ** 2)))
     field = np.fft.ifft2(np.fft.fft2(rng.standard_normal(shape)) * shaping).real
     return (field - field.mean()) / field.std()
-
-
-# -- the track heightmap ---------------------------------------------------------------------------
 
 
 def _bilinear_on_axes(field: np.ndarray, x0: float, y0: float, cell_x: float, cell_y: float, x, y):
@@ -257,28 +211,21 @@ def _bilinear_on_axes(field: np.ndarray, x0: float, y0: float, cell_x: float, ce
 
 
 def far_grid_cells(extent_x_m: float, extent_y_m: float) -> tuple[int, int]:
-    """Far-grid cells across a rectangle of the given size (about ``FAR_CELL_M`` each)."""
     return max(1, round(extent_x_m / FAR_CELL_M)), max(1, round(extent_y_m / FAR_CELL_M))
 
 
 @dataclass(frozen=True)
 class TrackTerrain:
-    """Track heightfield over the real strip plus a synthetic margin on every side.
-
-    It covers ``x in [x_min, x_max]`` and ``y in [y_min, y_max]``; the real strip is
-    ``[0, length_m] x [-width_m / 2, +width_m / 2]`` inside it.
-    """
-
-    heights: np.ndarray  # (rows=y, cols=x), meters relative to the spawn point
+    heights: np.ndarray
     x_min: float
     x_max: float
     y_min: float
     y_max: float
-    length_m: float  # of the real strip (not of the whole heightfield)
+    length_m: float
     width_m: float
-    offset_m: float  # absolute DTM elevation that was subtracted so that z = 0 at the spawn point
-    features: np.ndarray | None = None  # the synthetic section relief already included in ``heights``
-    sections: tuple[ts.Section, ...] = ()  # named sections of the strip (``track_sections``)
+    offset_m: float
+    features: np.ndarray | None = None
+    sections: tuple[ts.Section, ...] = ()
 
     @property
     def x_axis(self) -> np.ndarray:
@@ -290,11 +237,9 @@ class TrackTerrain:
 
     @property
     def far_cells(self) -> tuple[int, int]:
-        """Far-grid cells across this terrain: their nodes are a subset of the terrain's nodes."""
         return far_grid_cells(self.x_max - self.x_min, self.y_max - self.y_min)
 
     def sample(self, x, y):
-        """Bilinear height at world (x, y); accepts arrays; queries clamp to the terrain border."""
         n_rows, n_cols = self.heights.shape
         return _bilinear_on_axes(
             self.heights, self.x_min, self.y_min,
@@ -302,7 +247,6 @@ class TrackTerrain:
         )
 
     def sample_features(self, x, y):
-        """Bilinear height of the synthetic section features alone (zero when the terrain has none)."""
         if self.features is None:
             return np.zeros(np.broadcast(np.asarray(x, dtype=float), np.asarray(y, dtype=float)).shape)[()]
         n_rows, n_cols = self.features.shape
@@ -313,20 +257,12 @@ class TrackTerrain:
 
 
 def _coarse_surface(strip: Strip, bounds: tuple[float, float, float, float], x, y):
-    """Smoothed DTM (sigma ``DTM_BORDER_SIGMA_M``, extended past the strip by replicating its border)
-    interpolated bilinearly between the nodes of the far grid over ``bounds = (x_min, x_max, y_min,
-    y_max)``. The terrain's border takes exactly these values, and the far heightfield uses them at
-    its border nodes: both surfaces are then piecewise-linear along the border with the same values,
-    so they meet without any step (a step of even 1 cm exposes the hfield side wall)."""
     return _coarse_field(
         bounds, lambda nx, ny: sample_strip(strip, lowpass_dtm(strip, mp.DTM_BORDER_SIGMA_M), nx, ny), x, y
     )
 
 
 def _coarse_field(bounds: tuple[float, float, float, float], values, x, y):
-    """``values(x, y)`` evaluated at the nodes of the far grid over ``bounds`` and interpolated bilinearly
-    between them: on the border this is exactly what the far heightfield (which stores ``values`` at its
-    nodes) reproduces."""
     x_min, x_max, y_min, y_max = bounds
     cells_x, cells_y = far_grid_cells(x_max - x_min, y_max - y_min)
     nodes = np.meshgrid(np.linspace(x_min, x_max, cells_x + 1), np.linspace(y_min, y_max, cells_y + 1))
@@ -346,36 +282,24 @@ def generate_track_heightmap(
     sections: tuple[ts.Section, ...] | None = None,
     with_features: bool = True,
 ) -> TrackTerrain:
-    """Heightmap of the strip plus its margins at about ``cell_m`` resolution (1740 x 480 cells at
-    the default 0.25 m), deterministic per ``seed``.
-
-    Inside the strip: the low-passed real DTM plus full-strength synthetic roughness. Over the
-    ``TERRAIN_MARGIN_M`` beyond it, the DTM detail blends into its smooth extension and the roughness
-    fades to zero, so the border of the heightfield meets the far backdrop exactly. The section
-    features (``with_features``) are added on top with the same fade.
-    """
     strip = strip or load_strip()
     sections = sections or ts.default_sections(strip.length_m)
     bounds = _terrain_bounds(strip)
     x_min, x_max, y_min, y_max = bounds
-    # The far grid's nodes across the terrain are a subset of these nodes (see ``_coarse_surface``).
     far_cells_x, far_cells_y = far_grid_cells(x_max - x_min, y_max - y_min)
     nx = far_cells_x * max(1, round((x_max - x_min) / (cell_m * far_cells_x))) + 1
     ny = far_cells_y * max(1, round((y_max - y_min) / (cell_m * far_cells_y))) + 1
     cell_x, cell_y = (x_max - x_min) / (nx - 1), (y_max - y_min) / (ny - 1)
     x, y = np.meshgrid(np.linspace(x_min, x_max, nx), np.linspace(y_min, y_max, ny))
-    to_border = np.minimum.reduce([x - x_min, x_max - x, y - y_min, y_max - y])  # 0 on the heightfield border
-    fade = _smoothstep(0.0, mp.TERRAIN_MARGIN_M, to_border)  # 1 from the strip border inwards
+    to_border = np.minimum.reduce([x - x_min, x_max - x, y - y_min, y_max - y])
+    fade = _smoothstep(0.0, mp.TERRAIN_MARGIN_M, to_border)
 
     detailed = sample_strip(strip, lowpass_dtm(strip, mp.DTM_LOWPASS_SIGMA_M), x, y)
     smooth = _coarse_surface(strip, bounds, x, y)
     roughness = synthetic_roughness((ny, nx), cell_x, seed, cell_y_m=cell_y)
-    if with_features:  # row / column vectors: the feature weights only depend on x
+    if with_features:
         generator = tf.TrackFeatures(sections, seed)
         row, column = x[:1, :], y[:, :1]
-        # The local features (ripples, ledges, crater, ...) fade out towards the border. The climb is a regional
-        # rise: it continues across the border (the far backdrop carries it too), so near the border it is blended
-        # into its interpolation between the far nodes, which is exactly what the far heightfield stores there.
         coarse_climb = _coarse_field(bounds, generator.climb, x, y)
         features = generator.local_height(row, column) * fade + fade * generator.climb(row, column) + (1.0 - fade) * coarse_climb
     else:
@@ -388,15 +312,9 @@ def generate_track_heightmap(
     )
 
 
-# -- far backdrop --------------------------------------------------------------------------------------
-
-
 @dataclass(frozen=True)
 class FarTerrain:
-    """Coarse heightfield that continues the world beyond the track terrain. Rectangular cells: the
-    terrain's border lies exactly on grid nodes, so the two heightfields join without a step."""
-
-    heights: np.ndarray  # (rows=y, cols=x)
+    heights: np.ndarray
     x0: float
     y0: float
     cell_x: float
@@ -417,10 +335,6 @@ class FarTerrain:
 def generate_far_terrain(
     strip: Strip, terrain: TrackTerrain, seed: int = 0, pad_cells: int = FAR_DEFAULT_PAD_CELLS
 ) -> FarTerrain:
-    """Far backdrop: the smoothed DTM border extended outwards, relaxing to gentle procedural relief.
-
-    Under the track terrain the surface sinks by ``FAR_HOLE_DEPTH_M`` so it never shows through it.
-    """
     x_min, x_max, y_min, y_max = terrain.x_min, terrain.x_max, terrain.y_min, terrain.y_max
     cells_x, cells_y = terrain.far_cells
     cell_x, cell_y = (x_max - x_min) / cells_x, (y_max - y_min) / cells_y
@@ -435,7 +349,7 @@ def generate_far_terrain(
 
     extension = sample_strip(strip, lowpass_dtm(strip, mp.DTM_BORDER_SIGMA_M), x, y) - terrain.offset_m
     noise = _spectral_field(_rng(seed, _STREAM_FAR), (ny, nx), cell_x, cell_y, 60.0, 1500.0, 1.6)
-    climb = tf.TrackFeatures(terrain.sections, seed).climb(x, y)  # the regional rise never stops: up to the horizon
+    climb = tf.TrackFeatures(terrain.sections, seed).climb(x, y)
     heights = (
         extension * (1.0 - _smoothstep(0.0, FAR_RELAX_M, d_out))
         + FAR_RELIEF_AMPLITUDE_M * noise * _smoothstep(0.0, FAR_RELIEF_FADE_IN_M, d_out)
@@ -445,17 +359,11 @@ def generate_far_terrain(
     return FarTerrain(heights, x0, y0, cell_x, cell_y)
 
 
-# -- visual copies: decimated terrain pair for rendering ----------------------------------------------------
-
-
 def decimation_factor(cells: int, maximum: int) -> int:
-    """Largest divisor of ``cells`` that is at most ``maximum`` (1 when there is none): keeping every
-    n-th node then reproduces both ends of the grid exactly."""
     return max((n for n in range(1, max(1, maximum) + 1) if cells % n == 0), default=1)
 
 
 def _decimate_far(far: FarTerrain, terrain: TrackTerrain, max_factor: int) -> FarTerrain:
-    """Every ``n``-th node of the far grid, chosen so the terrain border still falls on kept nodes."""
     cells_x, cells_y = terrain.far_cells
     step = decimation_factor(math.gcd(cells_x, cells_y), max_factor)
     pad_x = round((terrain.x_min - far.x0) / far.cell_x)
@@ -471,14 +379,6 @@ def _decimate_far(far: FarTerrain, terrain: TrackTerrain, max_factor: int) -> Fa
 
 
 def _decimate_terrain(terrain: TrackTerrain, visual_far: FarTerrain, max_factor: int | tuple[int, int]) -> TrackTerrain:
-    """Every ``n``-th node of the terrain, with its border pulled onto the coarse visual far surface.
-
-    The collision terrain's border lies on the fine far grid, but the visual far grid is coarser, so
-    between its nodes it is a straight line that the fine border does not follow (a few cm off). A
-    step of even 1 cm shows the hfield's side wall, so the visual border is set to that line exactly
-    and the correction (a Coons blend of the four edge differences) fades to zero over
-    ``VISUAL_SEAM_BAND_M``: the strip and the lane are never touched.
-    """
     rows, cols = terrain.heights.shape
     max_x, max_y = (max_factor, max_factor) if isinstance(max_factor, int) else max_factor
     step_x, step_y = decimation_factor(cols - 1, max_x), decimation_factor(rows - 1, max_y)
@@ -507,12 +407,8 @@ def _decimate_terrain(terrain: TrackTerrain, visual_far: FarTerrain, max_factor:
 
 @dataclass(frozen=True)
 class VisualTerrain:
-    """The drawn ground: a grid of ``TrackTerrain`` patches, stored x-major (all ``bands`` patches across y for
-    the first x piece, then the next x piece...). Neighbours share their edge nodes and edge heights, so
-    together they are one continuous surface at mixed resolution."""
-
     segments: tuple[TrackTerrain, ...]
-    bands: int = 1  # patches across y in every x piece
+    bands: int = 1
 
     @property
     def x_min(self) -> float:
@@ -551,18 +447,15 @@ class VisualTerrain:
         return sum(s.heights.size for s in self.segments)
 
     def _indices(self, x, y):
-        """Patch index of every (x, y): the x piece by the west edges, the band by the south edges (clamped)."""
         columns = len(self.segments) // self.bands
         x_edges = np.array([self.segments[k * self.bands].x_min for k in range(1, columns)])
         y_edges = np.array([self.segments[k].y_min for k in range(1, self.bands)])
         return np.searchsorted(x_edges, x, side="left") * self.bands + np.searchsorted(y_edges, y, side="left")
 
     def segment_at(self, x: float, y: float = 0.0) -> TrackTerrain:
-        """The patch that contains world (x, y) (a shared edge belongs to the western / southern patch)."""
         return self.segments[int(self._indices(np.asarray(x, dtype=float), np.asarray(y, dtype=float)))]
 
     def sample(self, x, y):
-        """Bilinear height of the drawn surface at world (x, y); accepts arrays."""
         x, y = np.broadcast_arrays(np.asarray(x, dtype=float), np.asarray(y, dtype=float))
         index, out = self._indices(x, y), np.empty(x.shape)
         for k in np.unique(index):
@@ -572,7 +465,6 @@ class VisualTerrain:
 
 
 def _relief_span(terrain: TrackTerrain) -> tuple[float, float] | None:
-    """x extent, transition zones included, of the sections that need finely drawn cells (None when unknown)."""
     fine = [s for s in terrain.sections if s.name in VISUAL_FINE_SECTIONS]
     if not fine:
         return None
@@ -581,8 +473,6 @@ def _relief_span(terrain: TrackTerrain) -> tuple[float, float] | None:
 
 
 def _aligned_index(origin: float, cell: float, last: int, target: float, period: float, multiple: int, up: bool) -> int:
-    """Node index nearest below / above ``target`` that lies on ``origin + k * period`` (texture period) and is a
-    multiple of ``multiple`` (so every patch's decimated grid contains it), clamped to [0, last]."""
     steps = (math.ceil if up else math.floor)((target - origin) / period)
     index = round(steps * period / cell)
     index = -(-index // multiple) * multiple if up else index // multiple * multiple
@@ -592,8 +482,6 @@ def _aligned_index(origin: float, cell: float, last: int, target: float, period:
 def _split_visual(
     fine: TrackTerrain, coarse_x: int, lane_y: int, flank_y: int, span: tuple[float, float] | None
 ) -> VisualTerrain:
-    """Cut ``fine`` (every node kept) into the patch grid: x pieces (every column inside ``span``, every
-    ``coarse_x``-th outside) times y bands (every ``lane_y``-th row in the lane band, ``flank_y``-th beyond)."""
     n_rows, n_cols = fine.heights.shape
     last_r, last_c = n_rows - 1, n_cols - 1
     cell_x, cell_y = (fine.x_max - fine.x_min) / last_c, (fine.y_max - fine.y_min) / last_r
@@ -626,16 +514,8 @@ def make_visual_terrains(
     far_max_factor: int = VISUAL_FAR_MAX_DECIMATION,
     flank_max_factor: int = VISUAL_FLANK_MAX_DECIMATION_Y,
 ) -> tuple[VisualTerrain, FarTerrain]:
-    """Decimated (drawn) copies of the collision terrain pair, meeting each other without a step.
-
-    Rendering cost is proportional to the hfield triangle count (drawn twice: shadow pass), so the
-    viewer draws these lighter copies and hides the full-resolution collision heightfields. The drawn
-    terrain is a ``VisualTerrain`` patch grid: the lane band over the relief zone keeps every column, the
-    rest of the lane band every ``max_x``-th, and the flanks beyond it every ``flank_max_factor``-th row.
-    """
     max_x, max_y = (terrain_max_factor, terrain_max_factor) if isinstance(terrain_max_factor, int) else terrain_max_factor
     visual_far = _decimate_far(far, terrain, far_max_factor)
-    # the seam blend is evaluated on every node, so the patches keep exact values on the far line
     fine = _decimate_terrain(terrain, visual_far, (1, 1))
     rows, cols = terrain.heights.shape[0] - 1, terrain.heights.shape[1] - 1
     patches = _split_visual(
@@ -645,21 +525,16 @@ def make_visual_terrains(
     return patches, visual_far
 
 
-# -- lane and markers ------------------------------------------------------------------------------
-
-
 @dataclass(frozen=True)
 class Marker:
-    """A thin visual-only post standing on the terrain (cylinder of ``radius``, ``height``)."""
-
     name: str
-    kind: str  # "start" | "finish" | "distance" | "section"
+    kind: str
     x: float
     y: float
     z_base: float
     height: float
     radius: float
-    section: str = ""  # for kind == "section": the section that starts at this stake pair
+    section: str = ""
 
 
 def finish_x(terrain: TrackTerrain) -> float:
@@ -667,7 +542,6 @@ def finish_x(terrain: TrackTerrain) -> float:
 
 
 def plan_markers(terrain: TrackTerrain) -> list[Marker]:
-    """Start and finish lines (rows of low stakes across the lane) and a pair of posts every 50 m."""
     half_lane = mp.LANE_WIDTH_M / 2
     markers: list[Marker] = []
 
@@ -683,33 +557,20 @@ def plan_markers(terrain: TrackTerrain) -> list[Marker]:
         for side, y in (("s", -half_lane - MARKER_LANE_MARGIN_M), ("n", half_lane + MARKER_LANE_MARGIN_M)):
             add(f"marker_50m_{int(step * mp.MARKER_SPACING_M)}_{side}", "distance", x, y, DISTANCE_POST_HEIGHT_M, 0.04)
         step += 1
-    for section in terrain.sections[1:]:  # a subtle pair of stakes where each section (after the first) starts
+    for section in terrain.sections[1:]:
         for side, y in (("s", -half_lane - MARKER_LANE_MARGIN_M), ("n", half_lane + MARKER_LANE_MARGIN_M)):
             add(f"marker_section_{section.name}_{side}", "section", section.x_start, y, SECTION_POST_HEIGHT_M, 0.04, section.name)
     return markers
 
 
-# -- friction tiles and sand tint ---------------------------------------------------------------------------
-
-
 @dataclass(frozen=True)
 class Tile:
-    """A slice of the collision terrain: columns ``col0..col1`` inclusive (neighbours share an edge column)
-    with the sliding friction its geom carries."""
-
     col0: int
     col1: int
     friction: float
 
 
 def plan_friction_tiles(terrain: TrackTerrain) -> list[Tile]:
-    """Split the collision terrain along x so the soft-sand zone can change friction gradually.
-
-    MuJoCo friction is per geom, so the ground is cut into a west remainder, ``FRICTION_TILE_M``-wide
-    tiles across the whole transition-sand-transition zone (each with the friction of its centre) and
-    an east remainder. Tiles share their edge column, hence identical heights on the shared edge: no
-    step between them.
-    """
     n_cols = terrain.heights.shape[1]
     cell = (terrain.x_max - terrain.x_min) / (n_cols - 1)
     sand = next(s for s in terrain.sections if s.name == "soft_sand")
@@ -728,8 +589,6 @@ def plan_friction_tiles(terrain: TrackTerrain) -> list[Tile]:
 
 @dataclass(frozen=True)
 class Decal:
-    """A translucent visual layer over ``x0 <= x <= x1`` and ``|y| <= half_width`` (true meters)."""
-
     x0: float
     x1: float
     half_width: float
@@ -737,14 +596,12 @@ class Decal:
 
 
 def plan_sand_decals(sections: tuple[ts.Section, ...]) -> list[Decal]:
-    """Nested translucent layers that tint the ground in the soft-sand zone, fading in along the track
-    (following the sand weight) and out across it. Their stacked opacity peaks at ``SAND_TINT_ALPHA``."""
     sand = next(s for s in sections if s.name == "soft_sand")
     half = mp.SECTION_TRANSITION_M / 2
     xs = np.arange(sand.x_start - half, sand.x_end + half + 0.125, 0.25)
     weight = ts.section_weight("soft_sand", xs, sections)
     layers = len(SAND_DECAL_X_LEVELS) * len(SAND_DECAL_Y_HALF_WIDTHS_M)
-    alpha = 1.0 - (1.0 - mp.SAND_TINT_ALPHA) ** (1.0 / layers)  # `layers` of them stack to SAND_TINT_ALPHA
+    alpha = 1.0 - (1.0 - mp.SAND_TINT_ALPHA) ** (1.0 / layers)
     decals = []
     for level in SAND_DECAL_X_LEVELS:
         inside = xs[weight >= level]

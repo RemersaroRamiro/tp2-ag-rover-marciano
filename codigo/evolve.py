@@ -1,45 +1,29 @@
-"""Evolve rovers headless, record the run for replay, validate the best on unseen terrains.
+"""
+evolve.py: ejecuta una corrida completa del AG y guarda sus resultados.
 
-    uv run python evolve.py --preset rapido --seed 1
-    uv run python evolve.py --preset normal --seed 1 --runs 3 --out runs/tp      # three independent runs, seeds 1 2 3
-    uv run python evolve.py --summarize runs/tp                                  # compare finished runs again
+Para qué existe
+    Une todas las piezas: el AG (ga), la simulación de cada rover (evaluate), la aptitud (fitness) y
+    el registro de la corrida. Es el programa con el que se generaron las corridas del informe.
 
-A RUN is a preset (population x generations) plus a run seed and the GA's methods (``--selection``, ``--crossover``,
-``--mutation-rate``, ``--sigma-min`` ...; the defaults are Tabla 1 of the partial delivery, see ``ga.GAConfig``; with
-``--preset normal`` the whole of Tabla 1). Everything random derives from the run seed (the GA's
-own rng, and the terrain seeds through ``seed_schedule``), so the same run is reproducible, and it gives the same
-history for any number of workers. Per generation:
+Qué contiene
+    - EvolveConfig: una corrida, es decir, un preset, una semilla y los parámetros del AG.
+    - GenerationEvaluator: simula una generación entera en sus terrenos y le asigna aptitud a cada rover.
+    - validate_designs: prueba los mejores diseños y el rover de referencia en terrenos nunca vistos.
+    - success_report: decide si la corrida cumple el criterio de éxito.
+    - main: la interfaz de línea de comandos (también --random-search y --summarize).
 
-1. the generation's terrain seeds (``seeds_per_generation``, 2 in the presets) pick the rocks and the roughness
-   (relief and sections are fixed). One seed can be a wall: a single boulder stopped the whole population at the same x
-   in 5 of 20 generations, every rover scored the same, and that generation's selection was blind;
-2. every genome of the population, elites included, is decoded, simulated on EACH of those tracks (population x seeds
-   jobs as one batch for the worker pool) and scored by ``fitness.fitness_from_summaries`` (Deb's feasibility rules:
-   legal designs by their MEAN distance over the seeds, illegal ones by how little they violate; legality is the
-   design's, the same on every seed). Nothing is cached between generations, so the elites are judged afresh on each
-   new set of tracks;
-3. the GA (DEAP operators, ``ga.next_generation``) breeds the next population; the mutation step adapts to the
-   population's convergence (its diversity against generation 0's), never to the fitness history, which a new track
-   every generation turns into noise;
-4. the generation is recorded: the GA logs, and the replay files of ``replay.py`` (frames of every rover on the
-   generation's FIRST seed, summaries only on the others, so a generation's files stay the size they had with one
-   seed).
+Cómo funciona
+    En cada generación cada rover se simula en terrenos nuevos (2 en los presets), se calcula su
+    aptitud y el AG arma la generación siguiente. Al final, los mejores diseños y el rover tipo
+    Perseverance se validan en 5 terrenos no vistos. Éxito: el mejor diseño es válido y llega a la
+    meta en al menos 3 de los 5.
+    uv run python codigo/evolve.py --preset normal --seed 1
 
-At the end the final population's best genomes are validated on the run's unseen validation seeds (mean / min / max
-distance and statuses), which says how far a rover evolved on many tracks drives on a track it never met. The
-Perseverance-like reference design is validated with them, on the same terrains and in the same batch (``reference``
-in ``run.json``: the baseline a good design has to beat), and the run's success flag is computed (partial delivery,
-section 6.3: the best design, the final population's best, is legal and finishes on at least 3 of the 5 validation
-terrains; ``success`` in ``run.json``, with the finishes of the final top 3 and the same flag for the reference).
-
-``--random-search`` runs the other baseline (``baselines.py``) instead of the GA: the same budget, terrains and
-validation, with uniform random designs.
-
-Files of a run directory: ``run.json`` (manifest: rules, seeds, timings, per-generation summary, validation, success;
-refreshed after every generation), ``generations.csv``, ``best_genomes.json``, ``populations.npz`` (``ga.RunLogger``),
-``replay/gen_NNNN.npz|json`` and, once the run is finished, its charts ``generations_fitness.png`` and
-``generations_diversity.png`` (``plot_run``; ``uv run python plot_run.py RUN_DIR`` draws them again from the CSV). Fitness values of different generations are scored on different tracks: compare them as
-a trend, not as a monotone curve (the best of one generation may be lower than the previous one's).
+Dónde encaja
+    Etapa: corrida. Llama a ga, evaluate, fitness, seed_schedule, presets, replay, reference_rovers,
+    baselines y plot_run. Guarda run.json, generations.csv, best_genomes.json, populations.npz, las
+    grabaciones de replay/ y los dos gráficos. En modo simulación, el notebook usa el evaluador de
+    este archivo para puntuar cada generación.
 """
 
 from __future__ import annotations
@@ -70,13 +54,8 @@ from fitness import FitnessParams, fitness_from_summary, fitness_from_summaries,
 from seed_schedule import SeedSchedule
 
 
-# -- configuration ---------------------------------------------------------------------------------------------
-
-
 @dataclass(frozen=True)
 class EvolveConfig:
-    """One run: the preset, the run seed and every rule. ``workers=None`` = one process per CPU core."""
-
     preset: presets.Preset = presets.PRESETS["rapido"]
     seed: int = 1
     workers: int | None = None
@@ -85,23 +64,17 @@ class EvolveConfig:
     replay: replay_files.ReplayPolicy = field(default_factory=replay_files.ReplayPolicy)
     validation_seeds: int = params.VALIDATION_SEEDS
     validation_genomes: int = params.VALIDATION_GENOMES
-    seed_reference: bool = False  # put the Perseverance-like genome into generation 0 (off: a clean experiment)
-    # The GA's methods and parameters (selection, crossover, mutation, elitism; Tabla 1 by default). Its population size
-    # and seed are not used: they come from the preset and the run seed (``ga_config``).
+    seed_reference: bool = False
     ga_params: ga.GAConfig = field(default_factory=ga.GAConfig)
 
     @property
     def seeds_per_generation(self) -> int:
-        """Terrain seeds every rover of a generation is scored on (a property of the preset; ``--seeds-per-generation``)."""
         return self.preset.seeds_per_generation
 
     def ga_config(self) -> ga.GAConfig:
-        """``ga_params`` with the preset's population and the run seed."""
         return dataclasses.replace(self.ga_params, population_size=self.preset.population, seed=self.seed)
 
     def schedule(self) -> SeedSchedule:
-        """The run's terrain seeds: training seeds per generation and the validation seeds. A GA run and a baseline with
-        the same run seed, generations, terrains per generation and validation seeds get the same ones."""
         return SeedSchedule.for_run(self.seed, self.preset.generations, self.validation_seeds, self.seeds_per_generation)
 
 
@@ -113,14 +86,8 @@ class RunResult:
     manifest: dict
 
 
-# -- one generation: seed, simulate, score ------------------------------------------------------------------------
-
-
 @dataclass(frozen=True)
 class GenerationBatch:
-    """What one generation produced: its terrain seeds (the recorded one first), the runs by seed (``summaries[s][i]`` =
-    rover ``i`` on seed ``s``) and one scored ``Evaluation`` per rover."""
-
     generation: int
     seeds: tuple[int, ...]
     summaries: list
@@ -129,14 +96,10 @@ class GenerationBatch:
 
     @property
     def terrain_seed(self) -> int:
-        """The seed whose frames are recorded for replay."""
         return self.seeds[0]
 
 
 class GenerationEvaluator:
-    """The batch evaluator ``ga.run`` calls once per generation, in order: it knows which generation it is in
-    (hence which terrain seeds) and keeps the last batch for the recorder. Holds no fitness from earlier generations."""
-
     def __init__(self, pool, schedule: SeedSchedule, config: EvolveConfig):
         self.pool, self.schedule, self.config = pool, schedule, config
         self.generation = 0
@@ -150,10 +113,6 @@ class GenerationEvaluator:
         cfg, g = self.config, self.generation
         seeds = self.schedule.seeds_for_generation(g)
         rules = cfg.eval_config
-        # Tracks are built in the background while workers simulate: this generation's (in case nobody asked yet), then
-        # the next generation's (every validation track after the last one). The disk room covers every track that has
-        # to wait together, so asking for one never deletes another that is still needed: both generations' tracks, or
-        # the last generation's plus every validation track. With one seed that is the default room of two.
         room = max(SHARED_TRACKS_KEPT, 2 * len(seeds))
         keep = room if room > SHARED_TRACKS_KEPT else None
         self._prefetch(seeds, rules, keep)
@@ -162,16 +121,13 @@ class GenerationEvaluator:
         else:
             self._prefetch(self.schedule.validation, rules, max(SHARED_TRACKS_KEPT, len(seeds) + len(self.schedule.validation)))
         hz = cfg.replay.hz if cfg.replay.records_generation(g, cfg.preset.generations) else None
-        rates = [hz] + [None] * (len(seeds) - 1)  # frames of the first seed only; the others keep their summaries
+        rates = [hz] + [None] * (len(seeds) - 1)
         t0 = time.perf_counter()
-        by_seed = self.pool.evaluate_seeds(population, seeds, rules, rates)  # ONE batch: population x seeds jobs
+        by_seed = self.pool.evaluate_seeds(population, seeds, rules, rates)
         evaluations = [fitness_from_summaries([runs[i] for runs in by_seed], cfg.fitness_params) for i in range(len(population))]
         self.last = GenerationBatch(g, seeds, by_seed, evaluations, time.perf_counter() - t0)
         self.generation += 1
         return evaluations
-
-
-# -- the manifest -----------------------------------------------------------------------------------------------
 
 
 def genome_spec_info() -> dict:
@@ -181,7 +137,6 @@ def genome_spec_info() -> dict:
 
 
 def git_info() -> dict:
-    """Commit of the code that ran (and whether it had uncommitted changes); nulls when git is not available."""
     here = Path(__file__).resolve().parent
     try:
         commit = subprocess.run(["git", "rev-parse", "HEAD"], cwd=here, capture_output=True, text=True, timeout=10, check=True).stdout.strip()
@@ -205,31 +160,24 @@ def _now() -> str:
 
 
 def status_label(details: dict) -> str:
-    """``finished`` or ``dead:<reason>``."""
     return "finished" if details["finished"] else f"dead:{details['reason']}"
 
 
 def joined(values, spec: str = "", percent: bool = False) -> str:
-    """Values of the seeds of a generation on one console line: ``a + b`` (``percent``: shares as ``25% + 8%``)."""
     if percent:
         return " + ".join(f"{100 * v:.0f}%" for v in values)
     return " + ".join(format(v, spec) for v in values)
 
-
-# -- validation: the best designs and the reference on the unseen terrains ----------------------------------------------
 
 REFERENCE_LABEL = "reference"
 BEST_EVER_LABEL = "best_ever"
 
 
 def reference_genome() -> np.ndarray:
-    """The Perseverance-like reference design (Tabla 4 of the partial delivery): the baseline every run is validated with."""
     return reference_rovers.genome(reference_rovers.PERSEVERANCE_LIKE)
 
 
 def best_designs(genomes: np.ndarray, fitness: np.ndarray, count: int, prefix: str) -> list[tuple[str, np.ndarray, float]]:
-    """The ``count`` best distinct ``genomes`` by ``fitness`` (a non-finite fitness counts as the worst; ties keep their
-    order), as (label, genome, fitness) with labels ``<prefix>_best``, ``<prefix>_2``, ``<prefix>_3`` ..."""
     fitness = np.asarray(fitness, dtype=float)
     order = np.argsort(-np.where(np.isfinite(fitness), fitness, -np.inf), kind="stable")
     chosen: list[tuple[str, np.ndarray, float]] = []
@@ -243,7 +191,6 @@ def best_designs(genomes: np.ndarray, fitness: np.ndarray, count: int, prefix: s
 
 
 def validation_entry(label: str, genome: np.ndarray, training_fitness: float | None, seeds, evals) -> dict:
-    """What one design did on the validation seeds (``evals``: one scored run per seed, in order)."""
     dist = [e.details["distance_m"] for e in evals]
     fit = [e.fitness for e in evals]
     first = evals[0].details
@@ -258,9 +205,6 @@ def validation_entry(label: str, genome: np.ndarray, training_fitness: float | N
 
 
 def validate_designs(pool, config: EvolveConfig, seeds, candidates: list[tuple[str, np.ndarray, float]]) -> dict:
-    """``candidates`` (label, genome, training fitness) and the reference design on the validation ``seeds``, as ONE batch
-    for the pool (a task per seed and design, so the reference costs no extra batch). Returns ``seeds``, ``candidates``
-    (one ``validation_entry`` each, in order) and ``reference`` (``None`` without validation seeds)."""
     seeds = list(seeds)
     designs = [*candidates, (REFERENCE_LABEL, reference_genome(), None)]
     results: dict[str, list] = {label: [] for label, _, _ in designs}
@@ -275,8 +219,6 @@ def validate_designs(pool, config: EvolveConfig, seeds, candidates: list[tuple[s
             "reference": entries.get(REFERENCE_LABEL)}
 
 
-# -- the success criterion (partial delivery, section 6.3) ---------------------------------------------------------------
-
 SUCCESS_CRITERION = (
     f"partial delivery, section 6.3: the best design is legal (feasible) and finishes on at least "
     f"{params.SUCCESS_MIN_FINISHES} of {params.SUCCESS_OF_SEEDS} validation terrains (with another number of validation "
@@ -285,12 +227,10 @@ SUCCESS_CRITERION = (
 
 
 def required_finishes(seeds: int) -> int:
-    """Finishes the success criterion asks for on ``seeds`` validation terrains: 3 of 5, the same share rounded up otherwise."""
     return -(-params.SUCCESS_MIN_FINISHES * seeds // params.SUCCESS_OF_SEEDS)
 
 
 def meets_success_criterion(legal: bool, finished: int, seeds: int) -> bool:
-    """A legal design that finished on at least ``required_finishes(seeds)`` of its ``seeds`` validation terrains."""
     return bool(legal) and seeds > 0 and finished >= required_finishes(seeds)
 
 
@@ -301,8 +241,6 @@ def success_flag(entry: dict) -> dict:
 
 
 def success_report(validation: dict) -> dict | None:
-    """The success flag of the run's best design (its first validated candidate), the finishes of its top designs
-    (``top3``: every candidate but the best-ever one) and the reference's flag; ``None`` without validation seeds."""
     seeds = len(validation["seeds"])
     if not seeds:
         return None
@@ -318,7 +256,6 @@ def fmt_distance(entry: dict) -> str:
 
 
 def log_validation(validation: dict, log) -> None:
-    """The validation on the console: one line per design, the reference last with its outcome on every terrain."""
     reference = validation.get("reference")
     rows = [(c["label"], c) for c in validation["candidates"]] + ([("referencia", reference)] if reference else [])
     for label, c in rows:
@@ -347,25 +284,16 @@ def log_success(report: dict | None, log) -> None:
         log(f"  referencia (tipo Perseverance): {verdict(report['reference'])}")
 
 
-# -- a run ------------------------------------------------------------------------------------------------------
-
-
 class _Run:
-    """State of one GA run in progress. Its ``log`` is what ``ga.run`` calls after every generation.
-
-    ``execute`` drives a run through its steps (``announce``, ``search``, ``validate``, ``finish``); a baseline
-    (``baselines.RandomSearchRun``) is a subclass that replaces the search and keeps the seeds, the scoring, the files,
-    the validation and the success flag."""
-
-    kind = "ga"  # ``kind`` in run.json
-    unit = "gen"  # first word of a generation's console line
+    kind = "ga"
+    unit = "gen"
     records_replay = True
-    chart_title = ""  # suffix of the charts' titles
+    chart_title = ""
 
     def __init__(self, config: EvolveConfig, out_dir: Path, pool, log):
         self.config, self.pool, self.say = config, pool, log
         self.schedule = config.schedule()
-        self.logger = ga.RunLogger(out_dir)  # claims the directory: refuses a non-empty one
+        self.logger = ga.RunLogger(out_dir)
         self.out_dir = self.logger.out_dir
         self.batches = GenerationEvaluator(pool, self.schedule, config)
         self.t0 = time.perf_counter()
@@ -388,18 +316,16 @@ class _Run:
             "validation_rules": {"seeds": config.validation_seeds, "genomes": config.validation_genomes},
             "genome_spec": genome_spec_info(),
             "git": git_info(),
-            "environment": environment_info(config.workers, config.preset.population * config.seeds_per_generation),  # jobs per batch
+            "environment": environment_info(config.workers, config.preset.population * config.seeds_per_generation),
             "generations": [], "validation": None, "success": None, "final": None, "timings": None, "sizes": None,
         }
         self.write_manifest()
 
     def method_manifest(self) -> dict:
-        """The part of run.json that describes the search method: the GA's methods and parameters."""
         cfg = self.config
         return {"seed_reference": cfg.seed_reference, "ga": dataclasses.asdict(cfg.ga_config()),
                 "ga_operators": ga.describe_operators(cfg.ga_config()), "replay": dataclasses.asdict(cfg.replay)}
 
-    # -- files
     def write_manifest(self) -> dict:
         self.manifest = ga.jsonable(self.manifest)
         (self.out_dir / "run.json").write_text(json.dumps(self.manifest, indent=2), encoding="utf-8")
@@ -410,14 +336,12 @@ class _Run:
         return [p.stat().st_size for p in sorted(folder.iterdir())] if folder.exists() else []
 
     def write_replay(self, record: ga.GenerationRecord, batch: GenerationBatch) -> int:
-        """The generation's replay files; returns their size in bytes."""
         cfg = self.config
         npz = replay_files.write_generation(self.out_dir, record.generation, batch.terrain_seed, record.population, batch.summaries[0],
                                             batch.evaluations, cfg.replay, cfg.preset.generations,
                                             other_seeds=list(zip(batch.seeds[1:], batch.summaries[1:])))
         return sum(p.stat().st_size for p in (npz, npz.with_suffix(".json")))
 
-    # -- the steps ``execute`` drives
     def announce(self) -> None:
         cfg, p = self.config, self.config.preset
         per_generation = f" x {p.seeds_per_generation} semillas por generacion" if p.seeds_per_generation > 1 else ""
@@ -431,7 +355,6 @@ class _Run:
         seeds = [reference_genome()] if cfg.seed_reference else None
         return ga.run(self.batches, cfg.ga_config(), cfg.preset.generations, logger=self, seeds=seeds)
 
-    # -- called by ga.run after every generation
     def log(self, record: ga.GenerationRecord) -> None:
         cfg, batch = self.config, self.batches.last
         assert batch is not None and batch.generation == record.generation
@@ -440,8 +363,6 @@ class _Run:
         details = [e.details for e in batch.evaluations]
         finished, legal = sum(d["finished"] for d in details), sum(d["legal"] for d in details)
         best = record.best_details
-        # Blind-generation indicator: the share of the population within 1 m of the most common stop point, on each seed and
-        # on the averaged distance that is scored. Near 1 on a seed = one obstacle stopped almost everybody there.
         clusters = [stop_cluster_fraction([s.max_distance_m for s in runs]) for runs in batch.summaries]
         scored_cluster = stop_cluster_fraction([d["distance_m"] for d in details])
         finished_by_seed = [sum(s.status == "finished" for s in runs) for runs in batch.summaries]
@@ -459,7 +380,7 @@ class _Run:
             "eval_s": batch.wall_s, "elapsed_s": record.elapsed, "replay_bytes": replay_bytes})
         self.write_manifest()
         n, width, many = len(details), len(str(cfg.preset.generations)), len(batch.seeds) > 1
-        sigma = f" | sigma {record.sigma:.2f}" if np.isfinite(record.sigma) else ""  # a baseline has no mutation step
+        sigma = f" | sigma {record.sigma:.2f}" if np.isfinite(record.sigma) else ""
         self.say(
             f"{self.unit} {record.generation + 1:>{width}}/{cfg.preset.generations} | {'semillas' if many else 'semilla'} {joined(batch.seeds)} | "
             f"mejor {record.best_fitness:7.1f} ({'legal' if best['legal'] else 'ilegal'}, dist {joined(best['distances_m'], '.1f')} m, "
@@ -471,10 +392,7 @@ class _Run:
             f"{f' (promedio {100 * scored_cluster:.0f}%)' if many else ''} | "
             f"diversidad {record.diversity:.3f}{sigma} | {batch.wall_s:.1f} s")
 
-    # -- end of run
     def candidates(self, history: ga.RunHistory) -> list[tuple[str, np.ndarray, float]]:
-        """The designs to validate: the best genomes of the final population (``final_best`` first: the run's best design
-        for the success criterion) and the best-ever one."""
         cfg, last = self.config, history.records[-1]
         chosen = best_designs(last.population, last.fitness, cfg.validation_genomes, "final")
         ever = history.best_record
@@ -483,7 +401,6 @@ class _Run:
         return chosen
 
     def validate(self, history: ga.RunHistory) -> dict:
-        """The candidates and the reference design on the unseen validation seeds."""
         return validate_designs(self.pool, self.config, self.schedule.validation, self.candidates(history))
 
     def final_summary(self, history: ga.RunHistory) -> dict:
@@ -514,12 +431,10 @@ class _Run:
 
 
 def say(message: str = "") -> None:
-    """Console output, flushed at once (a long run is usually watched through a pipe or a log file)."""
     print(message, flush=True)
 
 
 def ga_summary(cfg: ga.GAConfig) -> str:
-    """The GA's methods and parameters on one console line."""
     select = f"torneo k={cfg.tournament_size}" if cfg.selection == "tournament" else "ruleta (aptitud desplazada)"
     cross = f"BLX-alfa {cfg.blx_alpha:g}" if cfg.crossover == "blx" else f"binomial (por gen {cfg.binomial_indpb:g})"
     sigma = (f"sigma {cfg.mutation_sigma:g}-{cfg.sigma_max:g} adaptativa" if cfg.adaptive_mutation
@@ -529,14 +444,11 @@ def ga_summary(cfg: ga.GAConfig) -> str:
 
 
 def write_charts(out_dir: Path, log=say, title_suffix: str = "") -> list[Path]:
-    """The charts of a finished run (``plot_run``: fitness, and diversity with sigma) next to its ``generations.csv``.
-    A plotting failure is only a warning: the run is already finished and saved, and the charts can be drawn again
-    from the CSV alone (``plot_run.py``)."""
     try:
-        import plot_run  # matplotlib is imported here only: a missing or broken plotting stack never stops a run
+        import plot_run
 
         charts = plot_run.plot_run(Path(out_dir) / "generations.csv", title_suffix=title_suffix)
-    except Exception as error:  # noqa: BLE001 - whatever went wrong, the finished run stays as it is
+    except Exception as error:
         log(f"Aviso: no se pudieron generar los graficos ({type(error).__name__}: {error}); "
             f"se regeneran con: uv run python plot_run.py {out_dir}")
         return []
@@ -545,13 +457,10 @@ def write_charts(out_dir: Path, log=say, title_suffix: str = "") -> list[Path]:
 
 
 def execute(run_type: type[_Run], config: EvolveConfig, out_dir: str | Path, evaluator=None, log=say) -> RunResult:
-    """One run of ``run_type`` (the GA's ``_Run`` or a baseline's subclass) into ``out_dir`` (new or empty): the search,
-    the validation with the reference design, the success flag, the manifest and the charts. ``evaluator`` is a worker
-    pool (``evaluate.Evaluator``) to reuse; by default one is made for this run and closed at its end."""
     own_pool = evaluator is None
     pool = Evaluator(workers=config.workers) if own_pool else evaluator
     run = None
-    try:  # everything after the pool is taken: whatever fails, the pool is closed or its room given back (``finally``)
+    try:
         run = run_type(config, Path(out_dir), pool, log)
         run.announce()
         history = run.search()
@@ -573,31 +482,24 @@ def execute(run_type: type[_Run], config: EvolveConfig, out_dir: str | Path, eva
     finally:
         if own_pool:
             pool.close()
-        else:  # a pool shared with the next run: give back the track room this run widened (the last generation and the validation)
+        else:
             pool.release_room()
-    write_charts(run.out_dir, log, run.chart_title)  # after the run is finished and saved: a plotting failure cannot mark it failed
+    write_charts(run.out_dir, log, run.chart_title)
     replay = f"; replay {manifest['sizes']['replay_bytes_total'] / 1e6:.1f} MB" if run.records_replay else ""
     log(f"Tiempo total {manifest['timings']['total_s']:.0f} s{replay} en {run.out_dir}")
     return RunResult(history, run.schedule, run.out_dir, manifest)
 
 
 def run_evolution(config: EvolveConfig, out_dir: str | Path, evaluator=None, log=say) -> RunResult:
-    """One GA run into ``out_dir`` (new or empty). ``evaluator`` is a worker pool (``evaluate.Evaluator``) to reuse; by
-    default one is made for this run and closed at its end."""
     return execute(_Run, config, out_dir, evaluator, log)
 
 
-# -- several independent runs ---------------------------------------------------------------------------------------
-
-
-KIND_NAMES = {"ga": "AG", "random_search": "aleatoria"}  # the ``tipo`` column of the summary table
+KIND_NAMES = {"ga": "AG", "random_search": "aleatoria"}
 
 
 def summary_row(manifest: dict) -> dict:
-    """The numbers of one finished run that the TP compares across runs. A run saved before the success flag existed
-    has no ``kind`` (it is a GA run), ``success`` or validated reference: those cells are ``None``."""
     validation = manifest.get("validation") or {}
-    candidates = validation.get("candidates") or []  # empty without validation seeds
+    candidates = validation.get("candidates") or []
     champion = candidates[0] if candidates else {}
     final = manifest.get("final") or {}
     success = manifest.get("success") or {}
@@ -627,8 +529,6 @@ def _stats(values) -> dict:
 
 
 def aggregate(rows: list[dict]) -> dict:
-    """Across runs: fitness and validation statistics, and how many runs met the success criterion (``successes`` of
-    the ``judged`` ones, which had validation seeds), for their best design and for the reference."""
     flags, reference_flags = [r.get("success") for r in rows], [r.get("reference_success") for r in rows]
     return {"runs": len(rows), "final_best_fitness": _stats(r["final_best_fitness"] for r in rows),
             "champion_mean_distance_m": _stats(r["champion_mean_distance_m"] for r in rows),
@@ -640,7 +540,6 @@ def aggregate(rows: list[dict]) -> dict:
 
 
 def format_summary(rows: list[dict]) -> str:
-    """A table of runs, one line each (GA runs and baselines alike), plus the means across the runs of each kind."""
     def num(x, spec="7.1f"):
         return format(x, spec) if x is not None else "    n/d"
 
@@ -660,7 +559,7 @@ def format_summary(rows: list[dict]) -> str:
             f"{(r['champion_finished'] if r['champion_finished'] is not None else '-')!s:>3}/{r['champion_seeds']:<4} | "
             f"{flag(r.get('success')):<5} | {top3:<14} | {reference:<10} | "
             f"{r['status']:<11} | {num(r['total_s'], '9.0f')}")
-    for kind in dict.fromkeys(r.get("kind", "ga") for r in rows):  # the kinds in the order they come
+    for kind in dict.fromkeys(r.get("kind", "ga") for r in rows):
         a = aggregate([r for r in rows if r.get("kind", "ga") == kind])
         mean, std = a["champion_mean_distance_m"]["mean"], a["champion_mean_distance_m"]["std"]
         if mean is None:
@@ -676,7 +575,6 @@ def format_summary(rows: list[dict]) -> str:
 
 
 def load_summaries(path: str | Path) -> list[dict]:
-    """Summary rows of the run in ``path`` (a run folder) or of every run folder inside it, by run seed."""
     path = Path(path)
     manifests = [path / "run.json"] if (path / "run.json").exists() else sorted(path.glob("*/run.json"))
     rows = [summary_row(json.loads(m.read_text(encoding="utf-8"))) for m in manifests]
@@ -684,9 +582,6 @@ def load_summaries(path: str | Path) -> list[dict]:
 
 
 def run_many(config: EvolveConfig, runs: int, base_dir: str | Path, evaluator=None, log=say, run=run_evolution) -> list[RunResult]:
-    """``runs`` independent runs with seeds ``config.seed``, ``config.seed + 1`` ... one after the other, each in
-    ``base_dir/seed-N``, sharing one worker pool; ``base_dir/summary.json`` is refreshed after every run. ``run`` is the
-    function of one run: the GA's ``run_evolution`` or a baseline's (``baselines.run_random_search``)."""
     if runs < 1:
         raise ValueError(f"runs must be at least 1, got {runs}")
     base = Path(base_dir)
@@ -710,9 +605,6 @@ def run_many(config: EvolveConfig, runs: int, base_dir: str | Path, evaluator=No
     log("")
     log(format_summary([summary_row(r.manifest) for r in results]))
     return results
-
-
-# -- command line -----------------------------------------------------------------------------------------------------
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -750,7 +642,7 @@ def build_parser() -> argparse.ArgumentParser:
                         "puntua con la misma aptitud en los terrenos de la generacion g del AG de la misma semilla) y validacion "
                         "de sus mejores disenos en las mismas semillas de validacion. No graba replay; no acepta las opciones "
                         "del AG, --seed-reference ni --replay all|best")
-    d = ga.GAConfig()  # the defaults: Tabla 1 of the partial delivery
+    d = ga.GAConfig()
     g = p.add_argument_group("algoritmo genetico (DEAP; los valores por defecto son los de la Tabla 1 de la entrega parcial)")
     g.add_argument("--selection", choices=ga.SELECTION_METHODS, default=d.selection,
                    help="seleccion: tournament = tools.selTournament, roulette = tools.selRoulette sobre la aptitud "
@@ -779,19 +671,17 @@ def build_parser() -> argparse.ArgumentParser:
     return p
 
 
-# The options of the GA (and of its recording) that a baseline has no use for: ``--random-search`` refuses them.
 GA_ONLY_OPTIONS = ("seed_reference", "replay", "replay_best_k", "replay_every", "selection", "tournament_size", "crossover",
                    "blx_alpha", "binomial_indpb", "crossover_rate", "mutation_rate", "sigma_min", "sigma_max",
                    "adaptive_mutation", "elite_count")
 
 
 def config_from_args(args: argparse.Namespace) -> EvolveConfig:
-    """The run the arguments describe; ``ValueError`` for an invalid preset size or GA parameter."""
     preset = presets.resolve(args.preset)
     if args.population is not None or args.generations is not None:
         preset = dataclasses.replace(preset, population=args.population or preset.population, generations=args.generations or preset.generations)
     if args.seeds_per_generation is not None:
-        preset = dataclasses.replace(preset, seeds_per_generation=args.seeds_per_generation)  # validates: at least 1
+        preset = dataclasses.replace(preset, seeds_per_generation=args.seeds_per_generation)
     rules = EvalConfig() if args.max_sim_time is None else EvalConfig(max_sim_time_s=args.max_sim_time)
     policy = replay_files.ReplayPolicy(mode=args.replay, every=args.replay_every, best_k=args.replay_best_k)
     ga_params = ga.GAConfig(
@@ -820,18 +710,18 @@ def main(argv: list[str] | None = None) -> int:
         rows = [row for path in args.summarize for row in load_summaries(path)]
         print(format_summary(rows) if rows else f"No hay corridas en {', '.join(args.summarize)}")
         return 0 if rows else 1
-    if args.random_search:  # a baseline: an option it would not use is a usage error, never silently ignored
+    if args.random_search:
         given = [f"--{name.replace('_', '-')}" for name in GA_ONLY_OPTIONS if getattr(args, name) != parser.get_default(name)
-                 and not (name == "replay" and args.replay == "none")]  # no replay is what a baseline does anyway
+                 and not (name == "replay" and args.replay == "none")]
         if given:
             parser.error(f"--random-search no usa {', '.join(given)} (son opciones del AG)")
     try:
         config = config_from_args(args)
-    except ValueError as error:  # an invalid GA parameter or preset size: a usage error (exit 2), not a traceback
+    except ValueError as error:
         parser.error(str(error))
     run = run_evolution
     if args.random_search:
-        import baselines  # it builds on this module, so it is imported here, not at the top
+        import baselines
 
         run = baselines.run_random_search
     out = Path(args.out) if args.out else default_out_dir(config, args.runs, "random-" if args.random_search else "")

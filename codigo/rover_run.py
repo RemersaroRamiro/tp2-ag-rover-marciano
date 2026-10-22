@@ -1,23 +1,25 @@
-"""Run-state tracking for one rover: progress, status, energy, section reached and a compact trajectory log.
+"""
+rover_run.py: sigue la corrida de un rover y decide cuándo y cómo termina.
 
-A run ends the first time one of these happens (checked in this order on every control tick):
+Para qué existe
+    Durante la simulación hay que medir cuánto avanzó el rover y detectar si llegó a la meta, se quedó
+    sin energía, salió del carril, volcó o quedó atascado. Este archivo concentra esas reglas.
 
-* ``finished``: the rover crossed the finish line (only when a finish x is known, i.e. on the track);
-* ``dead(energy)``: the battery's usable energy is exhausted;
-* ``dead(out_of_lane)``: ``|y|`` beyond ``RunLimits.lane_half_width_m``. On the track this is the 20 m playable lane
-  (``mars_params.LANE_WIDTH_M``), not the wider strip: outside the lane the rocks thin out and the cross slope fades
-  (``track_rocks``, ``track_terrain``), so driving along the flank would be an easier, unintended route for a
-  fitness that only counts distance along +x. The controller steers back to the centre, so a healthy rover never
-  gets there. Off (``None``) on flat ground;
-* ``dead(tipped)``: ``|roll|`` or ``|pitch|`` beyond ``TIP_LIMIT_DEG`` for more than ``TIP_TIME_S``;
-* ``dead(stuck)``: the furthest x reached grew by less than ``STUCK_PROGRESS_M`` in the last ``STUCK_WINDOW_S``;
-* ``dead(timeout)``: simulated time reached ``RunLimits.timeout_s`` (the normal end of a rover that keeps driving).
+Qué contiene
+    - RunLimits: los límites que terminan una corrida (sus valores están en rover_params).
+    - RunTracker: el estado, el avance y la trayectoria de una corrida; no usa MuJoCo.
+    - RoverRun: une un rover del modelo con su controlador, su batería y su RunTracker.
+    - simulate: avanza la simulación hasta que ningún rover sigue en marcha.
 
-The first cause sticks: later samples change nothing. The fitness basis is ``max_distance_m`` (furthest x reached
-minus the spawn x) and ``alive_time_s`` is the time at which the status left ``running``.
+Cómo funciona
+    En cada paso de control se revisa, en este orden: llegó a la meta, batería agotada, más de 10 m
+    fuera del centro del carril, volcado (más de 60° durante 1 s), atascado (menos de 0.2 m de avance
+    en 20 s) y tiempo máximo. La primera causa queda fija. La base de la aptitud es max_distance_m:
+    la x más lejana que alcanzó el rover menos la x de salida.
 
-``RunTracker`` is pure (it consumes ``RunSample`` values, no MuJoCo); ``RoverRun`` wires it to a rover in a model:
-controller, battery and tracker. Call ``RoverRun.update(data)`` after every ``mj_step`` (``simulate`` does).
+Dónde encaja
+    Etapa: simulación. Usa controller, energy, track_terrain, rover_params y mars_params.
+    Lo usa evaluate.py.
 """
 
 from __future__ import annotations
@@ -39,30 +41,25 @@ TRAJECTORY_COLUMNS = ("t", "x", "y", "z", "qw", "qx", "qy", "qz", "roll_deg", "p
 
 @dataclass(frozen=True)
 class RunLimits:
-    """When a run ends (defaults in ``rover_params``)."""
-
     timeout_s: float = 300.0
     tip_limit_deg: float = rp.TIP_LIMIT_DEG
     tip_time_s: float = rp.TIP_TIME_S
     stuck_progress_m: float = rp.STUCK_PROGRESS_M
     stuck_window_s: float = rp.STUCK_WINDOW_S
-    lane_half_width_m: float | None = None  # None: no lane (flat ground)
+    lane_half_width_m: float | None = None
 
     @classmethod
     def on_track(cls, timeout_s: float = 300.0, **kw) -> "RunLimits":
-        """Limits for the Jezero track: the lane is ``mars_params.LANE_WIDTH_M`` wide."""
         return cls(timeout_s=timeout_s, lane_half_width_m=mp.LANE_WIDTH_M / 2.0, **kw)
 
 
 @dataclass(frozen=True)
 class RunSample:
-    """One observation of a rover (chassis pose in the world frame)."""
-
     t: float
     x: float
     y: float
     z: float
-    quat: tuple[float, float, float, float]  # w, x, y, z
+    quat: tuple[float, float, float, float]
     roll_deg: float
     pitch_deg: float
     yaw_rad: float
@@ -75,8 +72,6 @@ class RunSample:
 
 
 class RunTracker:
-    """Status, progress and trajectory of one run, from a stream of ``RunSample``."""
-
     def __init__(self, x0: float, limits: RunLimits | None = None, section_at: Callable[[float], object] | None = None,
                  finish_x: float | None = None):
         self.x0 = x0
@@ -92,29 +87,24 @@ class RunTracker:
         self._rows: list[tuple[float, ...]] = []
         self._next_log_t = 0.0
         self._tip_since: float | None = None
-        self._progress: deque[tuple[float, float]] = deque()  # (t, max_x) about once a second, for the stuck rule
+        self._progress: deque[tuple[float, float]] = deque()
 
-    # -- derived
     @property
     def distance_m(self) -> float:
-        """Current x relative to the spawn."""
         return self.x_m - self.x0
 
     @property
     def max_distance_m(self) -> float:
-        """Furthest x reached relative to the spawn: the fitness basis."""
         return self.max_x_m - self.x0
 
     @property
     def section_reached(self) -> str | None:
-        """Name of the track section at the furthest x reached."""
         return None if self._section_at is None else self._section_at(self.max_x_m).name
 
     @property
     def section_now(self) -> str | None:
         return None if self._section_at is None else self._section_at(self.x_m).name
 
-    # -- updating
     def update(self, s: RunSample) -> None:
         if self.status != "running":
             return
@@ -122,7 +112,6 @@ class RunTracker:
         self.max_x_m = max(self.max_x_m, s.x)
         if s.t + 1e-9 >= self._next_log_t:
             self._rows.append(s.row())
-            # anchored to this sample, not accumulated: a gap in the samples must not make the log catch up row by row
             self._next_log_t = (math.floor((s.t + 1e-9) / rp.TRAJECTORY_LOG_DT_S) + 1) * rp.TRAJECTORY_LOG_DT_S
         outcome = self._outcome(s)
         if outcome is not None:
@@ -160,9 +149,7 @@ class RunTracker:
         t_ref, x_ref = self._progress[0]
         return t - t_ref >= lim.stuck_window_s - 1e-9 and self.max_x_m - x_ref < lim.stuck_progress_m
 
-    # -- log
     def trajectory_array(self) -> np.ndarray:
-        """Rows of ``TRAJECTORY_COLUMNS``: one per simulated second plus the latest state."""
         rows = list(self._rows)
         if self.last is not None and (not rows or rows[-1][0] != self.last.t):
             rows.append(self.last.row())
@@ -170,12 +157,6 @@ class RunTracker:
 
 
 class RoverRun:
-    """One rover in a model: its controller, its battery and its run tracker.
-
-    Build it after the model and ``MjData`` exist and the rover sits at its spawn pose; it edits the model (the
-    torque limit, see ``controller``) and writes the first drive command. ``battery_wh`` overrides the battery
-    capacity of the design (for experiments and tests)."""
-
     def __init__(self, model, data, design, prefix: str, world=None, limits: RunLimits | None = None,
                  genes: ctl.ControllerGenes | None = None, params: ctl.ControllerParams | None = None,
                  battery_wh: float | None = None):
@@ -198,7 +179,6 @@ class RoverRun:
         self.max_abs_y_m = 0.0
         self.last_speeds = self.controller.apply(data)
 
-    # -- forwarded state
     status = property(lambda self: self.tracker.status)
     reason = property(lambda self: self.tracker.reason)
     distance_m = property(lambda self: self.tracker.distance_m)
@@ -215,7 +195,6 @@ class RoverRun:
         return self._observe(data)[0]
 
     def _observe(self, data) -> tuple[RunSample, ctl.RoverState]:
-        """The sample of this instant and the controller state it was built from."""
         c = self.controller
         state = c.read_state(data)
         vx, vy = data.qvel[c.free_dof: c.free_dof + 2].tolist()
@@ -227,7 +206,6 @@ class RoverRun:
         ), state
 
     def update(self, data) -> None:
-        """Account for one physics step that has just been taken; on a control tick, observe and command."""
         if not self.running:
             return
         c = self.controller
@@ -257,7 +235,6 @@ class RoverRun:
 
 
 def simulate(model, data, runs: list[RoverRun], seconds: float) -> None:
-    """Step the model for up to ``seconds`` of simulated time, or until no run is still running."""
     import mujoco
 
     while data.time < seconds - 1e-9 and any(r.running for r in runs):

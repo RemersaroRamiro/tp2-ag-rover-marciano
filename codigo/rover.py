@@ -1,24 +1,26 @@
-"""Rover decoder: genome -> buildable rocker-bogie design -> masses -> constraints -> MuJoCo bodies.
+"""
+rover.py: convierte un genoma en un rover concreto: geometría, masas, restricciones y modelo MuJoCo.
 
-Topology (fixed): a chassis box between two mirror-image rocker-bogie suspensions, six wheels.
-On each side a *rocker* pivots on the chassis; the front wheel sits at the end of the front rocker arm; the
-rear rocker arm ends at the *bogie* pivot; the middle and rear wheels sit at the two ends of the bogie.
-Frame of a design: x forward, y left, z up; z = 0 is the ground under the nominal pose, x = 0 the chassis
-centre, y = 0 the symmetry plane. In the nominal pose (flat ground) all six axles are at height = wheel radius.
+Para qué existe
+    El AG trabaja con 15 números, pero para simular hace falta un rover físico. Este archivo hace esa
+    traducción y garantiza que cualquier genoma se pueda construir.
 
-Geometry is valid *by construction* (``design_from_genome``): whatever the 15 genes are, the decoder
-lengthens suspension parts instead of rejecting the genome (``RoverDesign.repairs`` lists what it changed):
+Qué contiene
+    - design_from_genome: arma el diseño rocker-bogie de seis ruedas y lo repara si hace falta.
+    - RoverDesign: el diseño resultante, con sus masas, su centro de masa y las reparaciones aplicadas.
+    - check_constraints: revisa las restricciones de la misión (masa total, vuelco estático, volumen
+      plegado y despeje del suelo) y mide cuánto se excede cada una, en forma relativa.
+    - rover_mjcf: genera los cuerpos, los motores y las uniones del rover para MuJoCo.
+    - spawn_pose y build_model_with_rovers: ubican el rover en la salida y compilan la escena.
 
-1. bogie length >= wheel diameter + ``MIN_WHEEL_GAP_M`` (middle and rear wheels must not overlap along x);
-2. rear rocker arm: a straight arm from the pivot (``hp`` above the axles) to the bogie pivot
-   (``BOGIE_PIVOT_HEIGHT_M`` above them) needs length >= hypot(drop, ``MIN_ARM_REACH_M``);
-3. front rocker arm: same rule for the drop ``hp``, and its reach must also keep the front wheel at least
-   ``MIN_WHEEL_GAP_M`` clear of the middle wheel.
-The chassis is always ``CHASSIS_SIDE_GAP_M`` narrower than the gap between the wheels' inner faces, and its
-underside never sits below the axle line, so it cannot touch a wheel. Ground clearance is derived.
+Cómo funciona
+    La geometría es válida por construcción: si dos ruedas se superponen o un brazo es demasiado corto,
+    el decodificador alarga piezas en lugar de descartar el genoma. Las masas salen de los genes
+    (ruedas, motores, batería, chasis y brazos) más una carga útil fija.
 
-Masses are derived from the genes (wheel: thin aluminium shell; drive motor: from peak torque; battery: from
-energy; chassis: areal density of its box surface; arms: linear density) plus a fixed payload inside the chassis.
+Dónde encaja
+    Etapa: simulación. Usa genome_spec, rover_params y scene.
+    Lo usan evaluate, headless, controller y replay.
 """
 
 from __future__ import annotations
@@ -32,19 +34,14 @@ import numpy as np
 import genome_spec
 import rover_params as rp
 
-WHEEL_IDS = ("fl", "fr", "ml", "mr", "rl", "rr")  # front / middle / rear x left / right
-
-
-# -- mass properties ---------------------------------------------------------------------------------
+WHEEL_IDS = ("fl", "fr", "ml", "mr", "rl", "rr")
 
 
 @dataclass(frozen=True)
 class MassProps:
-    """Mass, centre of mass (rover frame, nominal pose) and inertia about it (rover axes)."""
-
     mass: float
     com: tuple[float, float, float]
-    inertia: tuple[float, float, float, float, float, float]  # ixx, iyy, izz, ixy, ixz, iyz
+    inertia: tuple[float, float, float, float, float, float]
 
     @property
     def inertia_matrix(self) -> np.ndarray:
@@ -78,13 +75,11 @@ def _rod_part(mass: float, start, end, radius: float) -> tuple[float, np.ndarray
 
 
 def _wheel_shell_part(mass: float, center, radius: float, width: float) -> tuple[float, np.ndarray, np.ndarray]:
-    """Open cylindrical shell with its axis along y (the wheel spin axis)."""
     transverse = mass * (radius * radius / 2.0 + width * width / 12.0)
     return _part(mass, center, np.diag([transverse, mass * radius * radius, transverse]))
 
 
 def _compose(parts: Sequence[tuple[float, np.ndarray, np.ndarray]]) -> MassProps:
-    """Combine parts (mass, com, inertia about its own com) into one body (parallel-axis theorem)."""
     mass = sum(p[0] for p in parts)
     com = sum(p[0] * p[1] for p in parts) / mass
     inertia = np.zeros((3, 3))
@@ -94,33 +89,25 @@ def _compose(parts: Sequence[tuple[float, np.ndarray, np.ndarray]]) -> MassProps
     return MassProps(float(mass), tuple(float(v) for v in com), _pack(inertia))
 
 
-# -- the design ---------------------------------------------------------------------------------------
-
-
 @dataclass(frozen=True)
 class RoverDesign:
-    genes: dict[str, float]  # physical values of the 15 genes, as decoded
-    repairs: tuple[str, ...]  # genes whose value the decoder had to change to keep the geometry buildable
-    # wheels
+    genes: dict[str, float]
+    repairs: tuple[str, ...]
     wheel_radius_m: float
     wheel_width_m: float
-    wheel_centers: dict[str, tuple[float, float, float]]  # by ``WHEEL_IDS``, nominal pose
-    # chassis
+    wheel_centers: dict[str, tuple[float, float, float]]
     chassis_length_m: float
-    chassis_width_m: float  # derived: fits between the wheels' inner faces
+    chassis_width_m: float
     chassis_height_m: float
     chassis_bottom_z_m: float
-    # suspension (left side; the right side mirrors y)
     track_width_m: float
     rocker_pivot_l: tuple[float, float, float]
     bogie_pivot_l: tuple[float, float, float]
-    front_arm_m: float  # effective lengths after repair
+    front_arm_m: float
     rear_arm_m: float
     bogie_length_m: float
-    # drive
     motor_peak_torque_nm: float
     battery_energy_wh: float
-    # masses
     wheel_mass_kg: float
     motor_mass_kg: float
     battery_mass_kg: float
@@ -129,12 +116,11 @@ class RoverDesign:
     bodies: dict[str, MassProps]
     total_mass_kg: float
     com: tuple[float, float, float]
-    # derived metrics
     ground_clearance_m: float
     wheelbase_m: float
     tipover_longitudinal_deg: float
     tipover_lateral_deg: float
-    envelope_m: tuple[float, float, float]  # length, width, height of the stowed rover
+    envelope_m: tuple[float, float, float]
 
     @property
     def wheel_diameter_m(self) -> float:
@@ -142,12 +128,6 @@ class RoverDesign:
 
 
 def static_tipover_angles(com, x_front: float, x_rear: float, y_half: float) -> tuple[float, float]:
-    """Static tip-over angles in degrees: longitudinal (nose-over / tail-over, the smaller) and lateral.
-
-    Tilting the ground by ``atan(d / h)`` puts the centre of mass (height ``h``) over the edge of the support
-    polygon that is ``d`` away horizontally, so the rover starts to tip. ``x_front`` / ``x_rear`` are the
-    contact points along x and ``y_half`` the outer contact edge; the support polygon is symmetric in y.
-    """
     x, y, h = com
     longitudinal = math.degrees(math.atan2(min(x_front - x, x - x_rear), h))
     lateral = math.degrees(math.atan2(y_half - abs(y), h))
@@ -158,7 +138,7 @@ def design_from_genome(genome) -> RoverDesign:
     v = genome_spec.decode(genome)
     radius, wheel_w = v["wheel_diameter_m"] / 2, v["wheel_width_m"]
     track, length, height = v["track_width_m"], v["chassis_length_m"], v["chassis_height_m"]
-    hp = v["rocker_pivot_height_m"]  # pivot height above the axle line
+    hp = v["rocker_pivot_height_m"]
     hb = rp.BOGIE_PIVOT_HEIGHT_M
     repairs: list[str] = []
 
@@ -172,9 +152,9 @@ def design_from_genome(genome) -> RoverDesign:
     if rear_arm < math.hypot(drop_rear, rp.MIN_ARM_REACH_M):
         rear_arm = math.hypot(drop_rear, rp.MIN_ARM_REACH_M)
         repairs.append("rocker_rear_arm_m")
-    reach_rear = math.sqrt(max(rear_arm**2 - drop_rear**2, 0.0))  # horizontal, pivot -> bogie pivot (backwards)
+    reach_rear = math.sqrt(max(rear_arm**2 - drop_rear**2, 0.0))
 
-    mid_ahead_of_pivot = bogie_len / 2 - reach_rear  # x of the middle wheel relative to the rocker pivot
+    mid_ahead_of_pivot = bogie_len / 2 - reach_rear
     min_reach_front = max(rp.MIN_ARM_REACH_M, mid_ahead_of_pivot + 2 * radius + rp.MIN_WHEEL_GAP_M)
     front_arm = v["rocker_front_arm_m"]
     if front_arm < math.hypot(hp, min_reach_front):
@@ -195,7 +175,6 @@ def design_from_genome(genome) -> RoverDesign:
     chassis_width = track - wheel_w - 2 * rp.CHASSIS_SIDE_GAP_M
     bottom = max(pivot_z - height / 2, axle_z + rp.MIN_CHASSIS_BOTTOM_ABOVE_AXLE_M)
 
-    # -- masses
     wheel_mass = (
         (2 * math.pi * radius * wheel_w + 2 * math.pi * radius**2 * rp.WHEEL_SIDE_AREA_FRACTION)
         * rp.WHEEL_SHELL_THICKNESS_M * rp.ALUMINUM_DENSITY_KG_M3
@@ -212,9 +191,6 @@ def design_from_genome(genome) -> RoverDesign:
     lam = rp.ARM_LINEAR_DENSITY_KG_M
     bodies: dict[str, MassProps] = {}
     chassis_center = (0.0, 0.0, bottom + height / 2)
-    # The chassis rests on the two rocker pivots, so it tips unless its centre of mass is over them: the payload
-    # and battery are placed along x to put the chassis centre of mass on the pivot line (the structure is centred
-    # on the box). The shift is clamped to stay inside the box.
     loads = rp.PAYLOAD_MASS_KG + battery_mass
     load_x = float(np.clip(pivot_x * (structure_mass + loads) / loads, -rp.MAX_LOAD_OFFSET_FRACTION * length, rp.MAX_LOAD_OFFSET_FRACTION * length))
     bodies["chassis"] = _compose([
@@ -244,7 +220,6 @@ def design_from_genome(genome) -> RoverDesign:
     total = sum(b.mass for b in bodies.values())
     com = tuple(float(sum(b.mass * b.com[i] for b in bodies.values()) / total) for i in range(3))
 
-    # -- metrics
     x_front, x_rear = centers["fl"][0], centers["rl"][0]
     tip_long, tip_lat = static_tipover_angles(com, x_front, x_rear, half_track + wheel_w / 2)
     x_min, x_max = min(x_rear - radius, -length / 2), max(x_front + radius, length / 2)
@@ -266,14 +241,8 @@ def design_from_genome(genome) -> RoverDesign:
     )
 
 
-# -- mission constraints ---------------------------------------------------------------------------------
-
-
 @dataclass(frozen=True)
 class Violation:
-    """One broken mission constraint. ``magnitude`` is the relative overshoot (0 = at the limit), a ready
-    fitness violation score; ``detail`` names the axis or dimension when a code can occur several times."""
-
     code: str
     value: float
     limit: float
@@ -282,7 +251,6 @@ class Violation:
 
 
 def check_constraints(design: RoverDesign) -> list[Violation]:
-    """Mission constraints of ``rover_params`` (mass, static tip-over, stowed envelope, ground clearance)."""
     found: list[Violation] = []
     if design.total_mass_kg > rp.MAX_TOTAL_MASS_KG:
         found.append(Violation("mass_over_limit", design.total_mass_kg, rp.MAX_TOTAL_MASS_KG,
@@ -299,13 +267,7 @@ def check_constraints(design: RoverDesign) -> list[Violation]:
     return found
 
 
-# -- MuJoCo bodies ----------------------------------------------------------------------------------------
-
-
 class RoverXml(NamedTuple):
-    """MJCF fragments of one rover: ``body`` goes inside ``<worldbody>``, ``actuator`` inside ``<actuator>``
-    and ``equality`` inside ``<equality>`` (inner elements only, so several rovers concatenate)."""
-
     body: str
     actuator: str
     equality: str
@@ -313,9 +275,6 @@ class RoverXml(NamedTuple):
 
 @dataclass(frozen=True)
 class RoverPlacement:
-    """A rover to put into a model: ``pos`` is the design's frame origin (ground point under the chassis
-    centre in the nominal pose), ``yaw`` the heading about z in radians (0 = driving along +x)."""
-
     design: RoverDesign
     prefix: str
     pos: tuple[float, float, float]
@@ -339,18 +298,18 @@ def _inertial(props: MassProps, origin) -> str:
     return f'<inertial pos="{_f(*com)}" mass="{props.mass:.6f}" fullinertia="{_f(*props.inertia)}"/>'
 
 
-_BODY = 'rgba="0.86 0.85 0.82 1"'  # chassis: pale warm grey
-_ARM = 'rgba="0.62 0.64 0.68 1"'  # suspension: bare aluminium
+_BODY = 'rgba="0.86 0.85 0.82 1"'
+_ARM = 'rgba="0.62 0.64 0.68 1"'
 _TYRE = 'rgba="0.17 0.17 0.18 1"'
 _SPOKE = 'rgba="0.74 0.74 0.76 1"'
 _DETAIL = 'rgba="0.30 0.31 0.34 1"'
-_NOSE = 'rgba="0.15 0.55 0.75 1"'  # the front of the rover is easy to tell apart
+_NOSE = 'rgba="0.15 0.55 0.75 1"'
 _VISUAL = 'contype="0" conaffinity="0"'
 _COLLIDE = f'contype="{rp.ROVER_CONTYPE}" conaffinity="{rp.ROVER_CONAFFINITY}"'
 
 
 def _capsule(name: str, a, b, origin, visual: bool = True) -> str:
-    if not visual:  # the arms are drawn, not simulated (their mass is in the bodies' explicit <inertial>)
+    if not visual:
         return ""
     return (
         f'<geom name="{name}" type="capsule" group="{rp.ROVER_GROUP}" {_VISUAL} {_ARM} size="{rp.ARM_TUBE_RADIUS_M}" '
@@ -379,19 +338,6 @@ def _wheel_body(p: str, wheel: str, offset, d: RoverDesign, indent: int, visual:
 
 
 def rover_mjcf(design: RoverDesign, name_prefix: str, pos, yaw: float = 0.0, visual: bool = True) -> RoverXml:
-    """MuJoCo bodies, drive actuators and differential constraint of ``design``.
-
-    Bodies: a free chassis; per side a rocker hinged to the chassis about the lateral axis, a bogie hinged to
-    the rocker's rear end, and three wheels (front on the rocker, middle and rear on the bogie), each a
-    hinge with a velocity actuator whose force is limited to the motor's peak torque. One equality
-    constraint couples the two rocker joints (``q_left = -q_right``): the differential bar of the real
-    rocker-bogie, which keeps the chassis at the mean of the two rockers' angles. All names start with
-    ``name_prefix`` so many rovers can share a model. Geoms collide with the terrain and rocks (scene
-    defaults) but never with other rovers nor with parts of their own: see ``rover_params.ROVER_CONTYPE``.
-    ``visual=False`` leaves out the geoms that are only drawn (``contype = conaffinity = 0``: deck, power source,
-    mast, head, wheel spokes, suspension tubes) for headless runs: every body has an explicit ``<inertial>``, so
-    the mass properties, and therefore the physics, do not change.
-    """
     p, d = name_prefix, design
     r = d.wheel_radius_m
     half_track = d.track_width_m / 2
@@ -406,7 +352,7 @@ def rover_mjcf(design: RoverDesign, name_prefix: str, pos, yaw: float = 0.0, vis
         f'  <geom name="{p}chassis" type="box" group="{rp.ROVER_GROUP}" {_COLLIDE} {_BODY} '
         f'size="{_f(length / 2, d.chassis_width_m / 2, d.chassis_height_m / 2)}" pos="{_f(*chassis_center)}"/>',
     ]
-    if visual:  # visual-only details: electronics deck, power-source cylinder at the rear, camera mast at the front
+    if visual:
         lines += [
             f'  <geom name="{p}deck" type="box" group="{rp.ROVER_GROUP}" {_VISUAL} {_DETAIL} '
             f'size="{_f(length * 0.42, d.chassis_width_m * 0.42, 0.02)}" pos="{_f(0.0, 0.0, top + 0.02)}"/>',
@@ -457,9 +403,6 @@ def rover_mjcf(design: RoverDesign, name_prefix: str, pos, yaw: float = 0.0, vis
 
 
 def flat_scene_xml(placements: Sequence[RoverPlacement], friction: float = 0.5) -> str:
-    """A bare MJCF scene (one big plane, Mars gravity) holding ``placements``: for tests and quick headless runs.
-
-    The plane has contact priority and default collision bits, like the real terrain, so its friction applies."""
     parts = [rover_mjcf(pl.design, pl.prefix, pl.pos, pl.yaw) for pl in placements]
     join = "\n".join
     return f"""<mujoco model="rover_flat">
@@ -484,14 +427,7 @@ def build_flat_model(placements: Sequence[RoverPlacement], friction: float = 0.5
     return mujoco.MjModel.from_xml_string(flat_scene_xml(placements, friction))
 
 
-# -- on the track ----------------------------------------------------------------------------------------
-
-
 def spawn_pose(world, design: RoverDesign, x: float = rp.SPAWN_X_M, y: float = 0.0) -> tuple[tuple[float, float, float], float]:
-    """(frame origin, yaw) that puts ``design`` heading +x at (``x``, ``y``) with its wheels just above the ground.
-
-    The origin height is the highest ground under any wheel footprint (terrain heightfield, and the top of
-    every rock that reaches into a footprint) plus ``SPAWN_CLEARANCE_M``; the rover then settles by itself."""
     r, half_w = design.wheel_radius_m, design.wheel_width_m / 2
     top = -np.inf
     for cx, cy, _ in design.wheel_centers.values():
@@ -505,10 +441,6 @@ def spawn_pose(world, design: RoverDesign, x: float = rp.SPAWN_X_M, y: float = 0
 
 
 def build_model_with_rovers(world, placements: Sequence[RoverPlacement]):
-    """The scene of ``world`` (track or sandbox) with the rovers added, compiled.
-
-    Uses the implicit-in-velocity integrator: the stiff velocity servos of the drive motors are not stable
-    with the explicit default at the scene's timestep."""
     import mujoco
 
     import scene

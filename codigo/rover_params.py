@@ -1,92 +1,126 @@
-"""Every constant of the rover decoder in one place (SI units).
+"""
+rover_params.py: las constantes del rover (geometría, masas, restricciones, control y energía).
 
-Values come from the T13 constructibility research (cited inline); the ones with no published value carry
-``# ASSUMPTION``. Nothing else in the code base hard-codes
-them, and the tests read them from here, so changing a value here is enough.
+Para qué existe
+    Reúne en un solo lugar todos los valores fijos del rover que el AG no evoluciona, cada uno con su
+    fuente o marcado como supuesto. Ningún otro archivo los repite: cambiar un valor aquí es suficiente.
+
+Qué contiene
+    - Reparación de la geometría: separaciones mínimas entre ruedas, chasis y brazos de la suspensión.
+    - Modelo de masas: densidades y masas específicas con las que cada pieza obtiene su masa a partir
+      de los genes, más la carga útil fija.
+    - Restricciones de la misión: masa máxima, ángulo mínimo de vuelco, volumen plegado y despeje.
+    - Modelo MuJoCo: recorrido y amortiguación de las articulaciones, motores y filtro de colisiones
+      (los rovers chocan con el terreno y las rocas, nunca entre sí ni consigo mismos).
+    - Salida, controlador (50 Hz), energía (RTG y batería) y fin de corrida (vuelco y rover atascado).
+
+Dónde encaja
+    Etapa: simulación. No importa otros archivos del proyecto.
+    Lo usan rover, controller, energy, rover_run y evaluate.
+
+Fuentes
+    Valores medidos, publicados o calibrados (investigación de constructibilidad T13):
+    - ALUMINUM_DENSITY_KG_M3 = 2700: propiedad de las aleaciones de aluminio.
+    - WHEEL_SHELL_THICKNESS_M = 0.0053: espesor efectivo que agrupa piel, garras, llanta, cubo y
+      flexores, calibrado para que una rueda del tamaño de la de Perseverance (D 0.523 m, ancho 0.336 m;
+      Rankin et al. 2022, JPL, Tabla 1) pese ~9.4 kg (fuente secundaria, sin verificar).
+    - MOTOR_SPECIFIC_TORQUE_NM_PER_KG = 30: los actuadores espaciales dan de 24-26 N·m/kg (planetarios)
+      a 49-76 (harmonic drive), IDD de MER (Fleischner, ESMATS 2003); 30 es un valor reducido por freno,
+      rodamientos y encoder, elegido dentro de ese rango (supuesto).
+    - BATTERY_SPECIFIC_ENERGY_WH_PER_KG = 83: batería de Perseverance, 2408 Wh en un paquete de 29 kg
+      (West, Smart y Herman, JPL 2021).
+    - CHASSIS_AREAL_DENSITY_KG_M2 = 7: panel de panal de aluminio de 25 mm, 5.4 kg/m² (datos de
+      fabricante) × 1.3 por insertos y refuerzos.
+    - PAYLOAD_MASS_KG = 790: todo lo que no sale de los genes (MMRTG ~40-45 kg, carga científica 59 kg,
+      brazo y torreta, aviónica, control térmico, cableado, mástil, telecomunicaciones); calibrado para
+      que el rover tipo Perseverance sume ~1025 kg, la masa real de Mars 2020 (sus partes modeladas
+      pesan ~234 kg).
+    - MAX_TOTAL_MASS_KG = 1050: techo blando del sistema de entrada y descenso de MSL/M2020 (MSL: requisito
+      de 850 kg, voló con 899 kg; M2020 aterrizó con 1025 kg).
+    - MIN_TIPOVER_DEG = 45: requisito de MER de 45° de estabilidad estática en cabeceo y en rolido
+      (Harrington y Voorhees, ESMATS 2004).
+    - TILT_REF_DEG = 20: inclinación con la que el freno en pendientes actúa por completo; la pendiente
+      más empinada de la pista es la subida final de 18° (JPL 2026, ver mars_params).
+    - RTG_POWER_W = 110: potencia eléctrica del MMRTG al inicio de su vida útil (decae ~4 % por año, se
+      ignora).
+    - DRIVE_EFFICIENCY = 0.65: eficiencia de eléctrica a mecánica en la rueda (motor, caja reductora y
+      electrónica), estimada en 0.5-0.8; la fuente primaria no está registrada, así que es una estimación.
+    - BATTERY_MAX_DEPTH_OF_DISCHARGE = 0.60: parte usable de la capacidad, límite de vida útil por
+      ciclos de Mars 2020.
+    Supuestos propios (no hay un valor publicado):
+    - MAX_ENVELOPE_M = (3.0, 2.7, 2.2): el volumen plegado no está publicado; se usa como límite el de
+      Perseverance desplegado (~2.9 × 2.7 × 2.2 m, dentro de un escudo de 4.5 m).
+    - MIN_GROUND_CLEARANCE_M = 0.30: MER exigía superar obstáculos de 0.20 m; Perseverance supera rocas
+      de ~0.40 m.
+    - HOTEL_LOAD_W = 100: aviónica, control térmico y sensores; a propósito por debajo del RTG, así un
+      rover detenido nunca descarga la batería: solo se descarga al manejar.
+    - ARM_LINEAR_DENSITY_KG_M = 8 y WHEEL_SIDE_AREA_FRACTION = 0.25.
+    - HEADING_KP_MPS_PER_RAD, HEADING_KD_MPS_PER_RAD_S y LANE_KP_RAD_PER_M: ganancias ajustadas en terreno
+      plano (con LANE_KP = 0.10, un desvío de 3 m se corrige en ~20 s a 0.5 m/s; con 0.04 hacían falta 50 s).
+    - Decisiones de diseño: MIN_WHEEL_GAP_M, CHASSIS_SIDE_GAP_M, BOGIE_PIVOT_HEIGHT_M, ROCKER_RANGE_DEG,
+      BOGIE_RANGE_DEG, CONTROL_DT_S, MAX_TURN_DIFF_MPS, LANE_MAX_HEADING_RAD, MIN_SPEED_FRACTION,
+      TIP_LIMIT_DEG, TIP_TIME_S, STUCK_PROGRESS_M y STUCK_WINDOW_S.
 """
 
 from __future__ import annotations
 
-# -- geometry repair (the decoder makes every genome buildable, see ``rover.design_from_genome``) --------
-MIN_WHEEL_GAP_M = 0.05  # ASSUMPTION (design choice): minimum gap between neighbouring wheel rims along x
-CHASSIS_SIDE_GAP_M = 0.05  # ASSUMPTION (design choice): gap between a chassis side and the wheel inner face
-MIN_ARM_REACH_M = 0.15  # horizontal reach below which a rocker arm would be a vertical strut; arms are lengthened to it
-BOGIE_PIVOT_HEIGHT_M = 0.15  # ASSUMPTION (design choice): bogie pivot height above the axle line
-MIN_CHASSIS_BOTTOM_ABOVE_AXLE_M = 0.05  # the chassis underside never drops below the axle line plus this
-ARM_TUBE_RADIUS_M = 0.04  # tube radius used for the inertia of the suspension arms (and for drawing them)
+MIN_WHEEL_GAP_M = 0.05
+CHASSIS_SIDE_GAP_M = 0.05
+MIN_ARM_REACH_M = 0.15
+BOGIE_PIVOT_HEIGHT_M = 0.15
+MIN_CHASSIS_BOTTOM_ABOVE_AXLE_M = 0.05
+ARM_TUBE_RADIUS_M = 0.04
 
-# -- mass model (every body's mass is derived from the genes; the payload is fixed) ---------------------
-ALUMINUM_DENSITY_KG_M3 = 2700.0  # material property of aluminium alloys
-WHEEL_SHELL_THICKNESS_M = 0.0053  # EFFECTIVE thickness lumping skin, grousers, rims, hub and flexures: calibrated so a
-# Perseverance-size wheel (D 0.523 m, W 0.336 m; Rankin et al. 2022, JPL, Table 1) weighs ~9.4 kg (secondary source, unverified)
-WHEEL_SIDE_AREA_FRACTION = 0.25  # ASSUMPTION (design choice): share of the two side discs that is solid
-MOTOR_SPECIFIC_TORQUE_NM_PER_KG = 30.0  # space-rated actuators 24-26 N*m/kg (planetary) to 49-76 (harmonic), MER IDD
-# (Fleischner, ESMATS 2003); 30 derated for brake, bearings and encoder (assumption within that range)
-BATTERY_SPECIFIC_ENERGY_WH_PER_KG = 83.0  # Perseverance battery: 2408 Wh / 29 kg pack (West, Smart, Herman, JPL 2021)
-CHASSIS_AREAL_DENSITY_KG_M2 = 7.0  # 25 mm aluminium honeycomb panel 5.4 kg/m^2 (vendor data) x 1.3 for inserts/doublers
-ARM_LINEAR_DENSITY_KG_M = 8.0  # ASSUMPTION (design choice): no published value for rocker/bogie tubes
-PAYLOAD_MASS_KG = 790.0  # everything NOT derived from genes (MMRTG ~40-45 kg, science payload 59 kg, arm/turret,
-# avionics, thermal, harness, mast, telecom): calibrated so the Perseverance-like genome totals ~1025 kg, the real
-# Mars 2020 rover mass (the modelled parts of that design weigh ~234 kg)
-PAYLOAD_HEIGHT_FRACTION = 0.35  # payload centre above the chassis underside, as a fraction of the chassis height
-BATTERY_HEIGHT_FRACTION = 0.20  # battery centre above the chassis underside, as a fraction of the chassis height
-MAX_LOAD_OFFSET_FRACTION = 0.45  # payload and battery stay within this fraction of the chassis length from its centre
-PAYLOAD_SIZE_FRACTION = 0.6  # the payload lump fills this fraction of the chassis length and width (for its inertia)
+ALUMINUM_DENSITY_KG_M3 = 2700.0
+WHEEL_SHELL_THICKNESS_M = 0.0053
+WHEEL_SIDE_AREA_FRACTION = 0.25
+MOTOR_SPECIFIC_TORQUE_NM_PER_KG = 30.0
+BATTERY_SPECIFIC_ENERGY_WH_PER_KG = 83.0
+CHASSIS_AREAL_DENSITY_KG_M2 = 7.0
+ARM_LINEAR_DENSITY_KG_M = 8.0
+PAYLOAD_MASS_KG = 790.0
+PAYLOAD_HEIGHT_FRACTION = 0.35
+BATTERY_HEIGHT_FRACTION = 0.20
+MAX_LOAD_OFFSET_FRACTION = 0.45
+PAYLOAD_SIZE_FRACTION = 0.6
 
-# -- mission constraints (``rover.check_constraints``; thresholds from the Mars 2020 class of rover) ------
-MAX_TOTAL_MASS_KG = 1050.0  # soft ceiling of the MSL/M2020 EDL system: MSL req. 850 kg, flew 899 kg; M2020 landed 1025 kg
-MIN_TIPOVER_DEG = 45.0  # MER requirement: 45 deg static stability in pitch and roll (Harrington & Voorhees, ESMATS 2004)
-MAX_ENVELOPE_M = (3.0, 2.7, 2.2)  # ASSUMPTION: stowed envelope not published; Perseverance deployed ~2.9 x 2.7 x 2.2 m
-# inside a 4.5 m aeroshell, used as the limit (length, width, height)
-MIN_GROUND_CLEARANCE_M = 0.30  # ASSUMPTION: MER required 0.20 m obstacles; Perseverance handles ~0.40 m rocks
+MAX_TOTAL_MASS_KG = 1050.0
+MIN_TIPOVER_DEG = 45.0
+MAX_ENVELOPE_M = (3.0, 2.7, 2.2)
+MIN_GROUND_CLEARANCE_M = 0.30
 
-# -- simulation model (MJCF) ------------------------------------------------------------------------
-ROCKER_RANGE_DEG = 40.0  # ASSUMPTION (design choice): rocker travel about its pivot, each way
-BOGIE_RANGE_DEG = 45.0  # ASSUMPTION (design choice): bogie travel about its pivot, each way
-ROCKER_DAMPING_NMS = 20.0  # joint damping, keeps the free hinges from ringing
+ROCKER_RANGE_DEG = 40.0
+BOGIE_RANGE_DEG = 45.0
+ROCKER_DAMPING_NMS = 20.0
 BOGIE_DAMPING_NMS = 10.0
-WHEEL_DAMPING_NMS = 0.5  # rolling drag of the drive train
-WHEEL_ARMATURE_KG_M2 = 0.05  # rotor inertia reflected to the wheel through the gearbox
-DRIVE_SATURATION_RAD_S = 1.0  # the velocity servo saturates at the peak torque for a speed error of this many rad/s
-MAX_WHEEL_SPEED_MPS = 2.0  # control range of a drive actuator, as a rim speed
-WHEEL_FRICTION = (1.0, 0.005, 0.0001)  # the terrain has contact priority, so its friction is the one applied
-# Collision filtering. MuJoCo: two geoms collide when (contype1 & conaffinity2) or (contype2 & conaffinity1).
-# The scene's terrain and rocks keep the defaults (contype 1, conaffinity 1); a rover geom has contype 2 and
-# conaffinity 1, so rover vs terrain/rocks collides (terrain.contype & rover.conaffinity) while rover vs rover
-# never does (2 & 1 == 0 both ways), and neither do the parts of one rover.
+WHEEL_DAMPING_NMS = 0.5
+WHEEL_ARMATURE_KG_M2 = 0.05
+DRIVE_SATURATION_RAD_S = 1.0
+MAX_WHEEL_SPEED_MPS = 2.0
+WHEEL_FRICTION = (1.0, 0.005, 0.0001)
 ROVER_CONTYPE = 2
 ROVER_CONAFFINITY = 1
-ROVER_GROUP = 1  # drawn by default in the viewer (groups 0-2)
+ROVER_GROUP = 1
 
-# -- placing a rover on the track ----------------------------------------------------------------------
-SPAWN_X_M = 4.0  # ahead of the start line (x = 3 m), inside the first section
-SPAWN_CLEARANCE_M = 0.06  # wheels start this far above the highest ground under the rover and settle by themselves
+SPAWN_X_M = 4.0
+SPAWN_CLEARANCE_M = 0.06
 
-# -- controller (``controller.py``): heading hold toward +x, cruise speed, slope brake --------------------
-# All of these are design choices of the fixed, explainable controller (not evolved, not sourced): the three
-# evolved controller genes are ``target_speed_mps``, ``torque_limit_fraction`` and ``slope_brake``.
-CONTROL_DT_S = 0.02  # ASSUMPTION (design choice): the controller runs at 50 Hz; energy is integrated every physics step
-HEADING_KP_MPS_PER_RAD = 1.2  # ASSUMPTION (tuned on flat ground): wheel-speed difference (half) per radian of yaw error
-HEADING_KD_MPS_PER_RAD_S = 0.6  # ASSUMPTION (tuned on flat ground): damping on the yaw rate
-MAX_TURN_DIFF_MPS = 0.4  # ASSUMPTION (design choice): the left/right rim speeds differ by at most twice this
-LANE_KP_RAD_PER_M = 0.10  # ASSUMPTION (tuned on flat ground): heading offset asked per metre off the lane centre (a 3 m
-# offset is closed in ~1/(v*K) = 20 s at 0.5 m/s; 0.04 needed 50 s)
-LANE_MAX_HEADING_RAD = 0.35  # ASSUMPTION (design choice): the lateral term never asks for more than ~20 deg off +x
-TILT_REF_DEG = 20.0  # tilt at which the slope brake is fully applied: the steepest designed slope of the track is the
-# 18 deg final climb (JPL 2026, see ``mars_params``)
-MIN_SPEED_FRACTION = 0.25  # ASSUMPTION (design choice): the slope brake never slows the rover below this share of its target
+CONTROL_DT_S = 0.02
+HEADING_KP_MPS_PER_RAD = 1.2
+HEADING_KD_MPS_PER_RAD_S = 0.6
+MAX_TURN_DIFF_MPS = 0.4
+LANE_KP_RAD_PER_M = 0.10
+LANE_MAX_HEADING_RAD = 0.35
+TILT_REF_DEG = 20.0
+MIN_SPEED_FRACTION = 0.25
 
-# -- energy (``energy.py``): RTG + battery, no regeneration ---------------------------------------------
-RTG_POWER_W = 110.0  # MMRTG electrical output at beginning of life (T13 research; it decays ~4 %/yr, ignored)
-DRIVE_EFFICIENCY = 0.65  # electrical -> mechanical at the wheel (motor + gearbox + drive electronics): T13 research
-# estimate, range 0.5-0.8; the primary source is not recorded in the repository, so treat it as an estimate
-BATTERY_MAX_DEPTH_OF_DISCHARGE = 0.60  # usable share of the capacity: Mars 2020 cycle-life limit (T13 research)
-HOTEL_LOAD_W = 100.0  # ASSUMPTION: avionics, thermal control and sensors while awake; below the RTG output on purpose,
-# so an idle rover never drains the battery (only driving does). No published value for this model.
+RTG_POWER_W = 110.0
+DRIVE_EFFICIENCY = 0.65
+BATTERY_MAX_DEPTH_OF_DISCHARGE = 0.60
+HOTEL_LOAD_W = 100.0
 
-# -- run tracking (``rover_run.py``) ------------------------------------------------------------------------
-TIP_LIMIT_DEG = 60.0  # ASSUMPTION (design choice): |roll| or |pitch| beyond this for TIP_TIME_S means the rover tipped over
-TIP_TIME_S = 1.0  # ASSUMPTION (design choice)
-STUCK_PROGRESS_M = 0.2  # ASSUMPTION (design choice): less progress than this in STUCK_WINDOW_S means stuck
-STUCK_WINDOW_S = 20.0  # ASSUMPTION (design choice)
-TRAJECTORY_LOG_DT_S = 1.0  # one trajectory row per simulated second
+TIP_LIMIT_DEG = 60.0
+TIP_TIME_S = 1.0
+STUCK_PROGRESS_M = 0.2
+STUCK_WINDOW_S = 20.0
+TRAJECTORY_LOG_DT_S = 1.0

@@ -1,4 +1,21 @@
-"""Evolution presets: how big a GA run is. The GA loop (T18) and the benchmark share these constants."""
+"""
+presets.py: los tamaños de corrida del AG.
+
+Para qué existe
+    Da nombre a las combinaciones de población y generaciones, para lanzar una corrida con una sola
+    opción (--preset) y que las corridas comparables usen siempre los mismos tamaños.
+
+Qué contiene
+    - Preset: población, generaciones y terrenos por generación (2 por defecto: la distancia se
+      promedia), y la cantidad de simulaciones que cuesta una corrida.
+    - PRESETS: rapido (12 individuos × 10 generaciones), normal (30 × 30) y completo (50 × 60).
+    - SMOKE: el preset "prueba" (4 × 2), solo para verificar en segundos que todo funciona.
+    - resolve: devuelve un preset a partir de su nombre.
+
+Dónde encaja
+    Etapa: corrida. No importa otros archivos del proyecto. Lo usa evolve.py para leer la opción
+    --preset.
+"""
 
 from __future__ import annotations
 
@@ -11,7 +28,7 @@ class Preset:
     population: int
     generations: int
     description: str
-    seeds_per_generation: int = 2  # terrain seeds every rover of a generation is scored on (the distance is averaged)
+    seeds_per_generation: int = 2
 
     def __post_init__(self):
         if self.seeds_per_generation < 1:
@@ -19,8 +36,6 @@ class Preset:
 
     @property
     def evaluations(self) -> int:
-        """Rover simulations in one GA run (every generation re-evaluates its whole population, elites included, on each
-        of its terrain seeds: the track seeds change every generation)."""
         return self.population * self.generations * self.seeds_per_generation
 
 
@@ -30,13 +45,10 @@ PRESETS: dict[str, Preset] = {
     "completo": Preset("completo", 50, 60, "corrida completa, para las conclusiones del TP"),
 }
 
-# A tiny preset for smoke tests and for checking a change end to end in seconds; not part of PRESETS (the benchmark
-# estimates only the real ones), but ``evolve.py --preset prueba`` accepts it.
 SMOKE = Preset("prueba", 4, 2, "prueba minima: solo para verificar que todo funciona")
 
 
 def resolve(name: str) -> Preset:
-    """The preset called ``name`` (the real ones and ``prueba``); ``KeyError`` with the valid names otherwise."""
     available = {**PRESETS, SMOKE.name: SMOKE}
     if name not in available:
         raise KeyError(f"unknown preset {name!r}; choose one of {', '.join(available)}")

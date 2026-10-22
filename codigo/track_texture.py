@@ -1,16 +1,23 @@
-"""Ground texture for the long track, built from the NASA regolith photograph without visible repetition.
+"""
+track_texture.py: la textura del suelo de la pista, sin repeticiones visibles.
 
-The photograph is a small seamless tile (5 m wide on the track). Repeating it every 5 m along a
-380 m lane makes the tiling obvious in grazing views. ``make_track_texture`` builds a much larger
-seamless texture from it:
+Para qué existe
+    La foto de regolito de la NASA es una baldosa pequeña (5 m sobre la pista); repetida a lo largo de
+    380 m, el patrón se nota. Este archivo arma con ella una textura mucho más grande que no se repite
+    a simple vista. Es solo visual: no cambia la física.
 
-1. Stochastic tiling: on a lattice of one-tile cells every node draws the tile with a random cyclic
-   shift (a seamless tile stays seamless under cyclic shifts) and every pixel blends its four
-   surrounding nodes with bilinear weights, normalised so the fine-grain contrast is preserved.
-2. Large-scale variation: gentle multiplicative brightness patches and a faint warm/cool tint,
-   from periodic band-limited noise, so the same pebbles never sit in the same light twice.
+Qué contiene
+    - make_track_texture: arma la textura grande a partir de la baldosa, de forma determinista por semilla.
 
-Pure numpy, deterministic per seed, periodic over the whole texture.
+Cómo funciona
+    Cada nodo de una grilla toma la baldosa con un desplazamiento al azar y cada píxel mezcla sus cuatro
+    nodos vecinos. Encima se agregan manchas suaves de brillo y de tono.
+
+Dónde encaja
+    Etapa: simulación (escena, solo visual). No importa otros archivos del proyecto. Lo usa scene.py.
+
+Fuentes
+    - Foto PIA24627 (Mastcam-Z, NASA/JPL-Caltech/ASU/MSSS); ver codigo/assets/CREDITS.md.
 """
 
 from __future__ import annotations
@@ -20,13 +27,12 @@ import numpy as np
 _STREAM_SHIFTS = 104
 _STREAM_MACRO = 105
 
-BRIGHTNESS_VARIATION = 0.02  # std of the multiplicative brightness patches
-TINT_VARIATION = 0.01  # std of the red/blue warm-cool tint
-MACRO_WAVELENGTH_MIN_TILES = 0.6  # patches smaller than this are left to the photograph itself
+BRIGHTNESS_VARIATION = 0.02
+TINT_VARIATION = 0.01
+MACRO_WAVELENGTH_MIN_TILES = 0.6
 
 
 def _periodic_noise(rng: np.random.Generator, shape: tuple[int, int], wavelength_min_px: float) -> np.ndarray:
-    """Zero-mean, unit-std periodic noise with a ``1/k`` spectrum and nothing finer than the cut-off."""
     height, width = shape
     spectrum = np.fft.rfft2(rng.standard_normal(shape))
     ky = np.fft.fftfreq(height)[:, None]
@@ -39,7 +45,6 @@ def _periodic_noise(rng: np.random.Generator, shape: tuple[int, int], wavelength
 
 
 def make_track_texture(tile: np.ndarray, cells: tuple[int, int] = (10, 5), seed: int = 0) -> np.ndarray:
-    """Seamless ``uint8`` texture of ``cells = (columns, rows)`` tiles from an RGB ``tile`` array."""
     tile_h, tile_w = tile.shape[:2]
     cells_x, cells_y = cells
     height, width = cells_y * tile_h, cells_x * tile_w

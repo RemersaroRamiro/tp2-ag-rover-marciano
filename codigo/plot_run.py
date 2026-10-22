@@ -1,25 +1,24 @@
-"""Charts of one GA run, drawn from its per-generation CSV alone (no simulator, no MuJoCo).
+"""
+plot_run.py: dibuja los gráficos de una corrida a partir de su CSV.
 
-    uv run python plot_run.py runs/<run>                  # the run folder: reads its generations.csv
-    uv run python plot_run.py runs/tp                     # every run folder inside (seed-1, seed-2, ...)
-    uv run python plot_run.py results/random_search.csv --title-suffix "busqueda aleatoria"
+Para qué existe
+    Los gráficos del informe salen solo de generations.csv, sin simulador ni MuJoCo, así que se pueden
+    volver a dibujar en cualquier momento a partir de una corrida guardada.
 
-Two PNGs per CSV, written next to it (or into ``--out``), named after the CSV: ``<stem>_fitness.png`` and
-``<stem>_diversity.png`` (``generations.csv`` -> ``generations_fitness.png``). Any CSV with the columns of
-``ga.CSV_COLUMNS`` works (a baseline's too); ``generation``, ``best`` and ``mean`` are required, ``diversity`` and
-``mutation_sigma`` are drawn when present.
+Qué contiene
+    - read_generations: lee las columnas del CSV.
+    - fitness_figure: el gráfico "Evolución de la Aptitud" (máximo y promedio por generación).
+    - diversity_figure: la diversidad de la población y el paso de mutación σ, ambos en unidades de gen.
+    - plot_run: guarda los dos PNG junto al CSV (generations_fitness.png y generations_diversity.png).
 
-- fitness chart, in the style of the course's approved example: title "Evolución de la Aptitud", x "Generación",
-  y "Aptitud", series "Máximo" (``best``) and "Promedio" (``mean``), grid, whole-number generation ticks;
-- diversity chart: "Diversidad y paso de mutación", the population diversity (``diversity`` = mean per-gene standard
-  deviation) and the mutation step (``mutation_sigma``). Both are in normalised gene units ([0, 1]), so they share one
-  y axis.
+Cómo funciona
+    Los puntos no finitos (-inf o NaN) se omiten de la curva y una nota al pie indica cuántos son.
+    Los textos de los gráficos están en español porque van al informe.
+    uv run python codigo/plot_run.py runs/<corrida>
 
-The chart text is Spanish because the charts go into the Spanish report. Generations are numbered as in the CSV (0 =
-the initial population, as in DEAP's logbook). Fitness may be negative (an illegal design scores -(1 + violation)) and
-non-finite (-inf: every simulation of the generation failed; NaN: no finite fitness to average): non-finite points are
-left out of their line and a note under the chart says how many, per series; a series without any finite value is not
-drawn and the note says so ("sin datos").
+Dónde encaja
+    Etapa: resultados. No importa otros archivos del proyecto; evolve.py lo llama al terminar cada
+    corrida.
 """
 
 from __future__ import annotations
@@ -35,7 +34,7 @@ from matplotlib.backends.backend_agg import FigureCanvasAgg
 from matplotlib.figure import Figure
 from matplotlib.ticker import MaxNLocator
 
-CSV_NAME = "generations.csv"  # the file ``ga.RunLogger`` writes in a run folder
+CSV_NAME = "generations.csv"
 REQUIRED_COLUMNS = ("generation", "best", "mean")
 
 FITNESS_TITLE = "Evolución de la Aptitud"
@@ -48,15 +47,12 @@ MEAN_LABEL = "Promedio"
 DIVERSITY_LABEL = "Diversidad (desvío medio por gen)"
 SIGMA_LABEL = "σ de mutación"
 
-FIGSIZE = (8.0, 5.0)  # inches
-DPI = 150  # crisp enough for a printed report
+FIGSIZE = (8.0, 5.0)
+DPI = 150
 
 
 @dataclass(frozen=True)
 class RunCharts:
-    """What ``plot_run`` drew: the two PNG paths, their figures, and per series how many non-finite points were left
-    out (only series with at least one)."""
-
     fitness_png: Path
     diversity_png: Path
     fitness_figure: Figure
@@ -65,7 +61,6 @@ class RunCharts:
 
 
 def _number(text: str | None) -> float:
-    """A CSV cell as a float; empty or unreadable is NaN ("-inf", "inf" and "nan" read as themselves)."""
     try:
         return float(text)
     except (TypeError, ValueError):
@@ -73,8 +68,6 @@ def _number(text: str | None) -> float:
 
 
 def read_generations(csv_path: str | Path) -> dict[str, list[float]]:
-    """The CSV's columns as lists of floats (``generation`` as ints). ``ValueError`` without the required columns or
-    without any row."""
     with open(csv_path, newline="", encoding="utf-8") as f:
         reader = csv.DictReader(f)
         columns = reader.fieldnames or []
@@ -90,18 +83,17 @@ def read_generations(csv_path: str | Path) -> dict[str, list[float]]:
 
 
 def _draw_series(ax, generations, values, label) -> int | None:
-    """One line of the finite points; returns how many points were left out, or ``None`` if nothing was drawn."""
     points = [(g, v) for g, v in zip(generations, values) if math.isfinite(v)]
     if not points:
         return None
     xs, ys = zip(*points)
-    ax.plot(xs, ys, label=label, marker="o" if len(points) == 1 else None)  # a lone point needs a marker to be seen
+    ax.plot(xs, ys, label=label, marker="o" if len(points) == 1 else None)
     return len(values) - len(points)
 
 
 def _chart(series: list[tuple[str, list[float]]], generations, title, y_label) -> tuple[Figure, dict[str, int]]:
     fig = Figure(figsize=FIGSIZE)
-    FigureCanvasAgg(fig)  # headless (Agg); no pyplot, so no global state and no window
+    FigureCanvasAgg(fig)
     ax = fig.add_subplot()
     skipped, missing = {}, []
     for label, values in series:
@@ -134,21 +126,17 @@ def _titled(title: str, suffix: str) -> str:
 
 
 def fitness_figure(data: dict[str, list[float]], title_suffix: str = "") -> tuple[Figure, dict[str, int]]:
-    """Best ("Máximo") and mean ("Promedio") fitness per generation, and the non-finite points left out per series."""
     series = [(BEST_LABEL, data["best"]), (MEAN_LABEL, data["mean"])]
     return _chart(series, data["generation"], _titled(FITNESS_TITLE, title_suffix), FITNESS_LABEL)
 
 
 def diversity_figure(data: dict[str, list[float]], title_suffix: str = "") -> tuple[Figure, dict[str, int]]:
-    """Population diversity and mutation sigma per generation (one axis: both in gene units)."""
     nothing = [math.nan] * len(data["generation"])
     series = [(DIVERSITY_LABEL, data.get("diversity", nothing)), (SIGMA_LABEL, data.get("mutation_sigma", nothing))]
     return _chart(series, data["generation"], _titled(DIVERSITY_TITLE, title_suffix), DIVERSITY_Y_LABEL)
 
 
 def plot_run(csv_path: str | Path, out_dir: str | Path | None = None, title_suffix: str = "") -> RunCharts:
-    """Both charts of the run logged in ``csv_path``, saved as ``<stem>_fitness.png`` and ``<stem>_diversity.png``
-    in ``out_dir`` (default: the CSV's folder)."""
     csv_path = Path(csv_path)
     folder = Path(out_dir) if out_dir is not None else csv_path.parent
     folder.mkdir(parents=True, exist_ok=True)
@@ -162,16 +150,12 @@ def plot_run(csv_path: str | Path, out_dir: str | Path | None = None, title_suff
 
 
 def find_csvs(path: str | Path) -> list[Path]:
-    """The CSVs a path names: a CSV file; a run folder (its ``generations.csv``); or a folder of run folders."""
     path = Path(path)
     if path.is_file():
         return [path]
     if (path / CSV_NAME).is_file():
         return [path / CSV_NAME]
     return sorted(path.glob(f"*/{CSV_NAME}")) if path.is_dir() else []
-
-
-# -- command line -----------------------------------------------------------------------------------------------------
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -197,7 +181,7 @@ def main(argv: list[str] | None = None) -> int:
             print(f"Error: no hay CSV de generaciones en {path}", file=sys.stderr)
             code = 1
         csvs += found
-    if args.out and len(csvs) > 1:  # several runs' generations.csv would overwrite each other's charts there
+    if args.out and len(csvs) > 1:
         parser.error("--out solo sirve con un unico CSV")
     for csv_path in csvs:
         try:

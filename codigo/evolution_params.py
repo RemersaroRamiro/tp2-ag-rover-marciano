@@ -1,36 +1,47 @@
-"""Every constant of the evolution loop in one place: fitness offset, recording, validation (SI units).
+"""
+evolution_params.py: las constantes del experimento evolutivo.
 
-Nothing here is a physical quantity of the rover (see ``rover_params``) nor a rule of the simulation (see
-``evaluate.EvalConfig``); these are the experiment's own choices, and the ones a report has to state.
+Para qué existe
+    Reúne en un solo lugar las decisiones del experimento que el informe tiene que declarar. No son
+    medidas físicas del rover (eso está en rover_params) ni reglas de la simulación (eso está en
+    evaluate.EvalConfig).
+
+Qué contiene
+    - Aptitud: INFEASIBLE_OFFSET = 1.0. Un diseño inválido puntúa -(1.0 + violación total), siempre por
+      debajo de cualquier diseño válido, que puntúa su distancia (≥ 0). La violación total es la suma
+      de los excesos relativos de las restricciones no cumplidas: (valor - límite) / límite. Cualquier
+      valor positivo da el mismo orden; 1.0 solo mantiene legibles los puntajes. Reemplaza a una
+      penalización anterior de 500 m por unidad de violación, que a los mejores diseños les convenía
+      pagar: quedaban entre un 4 % y un 7 % fuera del volumen permitido.
+    - Semillas: TERRAIN_SEED_LIMIT = 2**31 - 1 (las semillas de terreno se eligen en [1, 2**31 - 1)) y
+      SCHEDULE_TAG, que se mezcla con la semilla de la corrida para que las semillas de terreno salgan
+      de un flujo aleatorio distinto del que usa el AG.
+    - Validación y éxito: los VALIDATION_GENOMES = 3 mejores genomas se validan en VALIDATION_SEEDS = 5
+      terrenos nunca vistos. Una corrida tiene éxito si su mejor diseño es válido y llega a la meta en
+      SUCCESS_MIN_FINISHES = 3 de SUCCESS_OF_SEEDS = 5 terrenos (entrega parcial, sección 6.3); con otra
+      cantidad de terrenos se exige la misma proporción, redondeada hacia arriba.
+    - Grabación: REPLAY_HZ = 10 cuadros por segundo simulado; REPLAY_MAX_FRAMES = 6000 cuadros por
+      rover como máximo (un rover que llega a la meta necesita unos 5900, así que solo se reduce la
+      tasa de uno que avanza muy lento hasta el tiempo límite); REPLAY_BEST_K = 5 rovers por generación
+      en el modo de grabación "best".
+
+Dónde encaja
+    Etapa: aptitud, corrida y resultados. No importa otros archivos del proyecto.
+    Lo usan fitness, evolve, seed_schedule y replay.
 """
 
 from __future__ import annotations
 
-# -- fitness (``fitness.py``) --------------------------------------------------------------------------------------
-INFEASIBLE_OFFSET = 1.0  # Deb (2000) feasibility rules folded into one scalar (see ``fitness``): a legal design scores its
-# distance in metres (>= 0); an illegal one scores -(INFEASIBLE_OFFSET + total violation) < 0, where the total violation is
-# the sum of the RELATIVE overshoots of the broken mission constraints (``rover.Violation.magnitude`` = (value - limit) /
-# limit, dimensionless). Any positive value gives the same ordering (every illegal design below every legal one, illegal
-# ones by smaller violation first, legal ones by larger distance first); 1.0 just keeps the illegal scores readable.
-# Replaces the former soft penalty PENALTY_M_PER_UNIT = 500 m per unit of violation (retired: champions sat 4-7 % over
-# the envelope because the penalty was worth paying; see the T18 results).
+INFEASIBLE_OFFSET = 1.0
 
-# -- seeds (``seed_schedule.py``) ----------------------------------------------------------------------------------
-TERRAIN_SEED_LIMIT = 2**31 - 1  # terrain seeds are drawn from [1, this)
-SCHEDULE_TAG = 0x52_4F_56_33  # mixed with the run seed so the terrain seeds are a stream apart from the GA's own rng
-VALIDATION_SEEDS = 5  # unseen terrain seeds every run is validated on at the end
-VALIDATION_GENOMES = 3  # how many of the final population's best genomes are validated
+TERRAIN_SEED_LIMIT = 2**31 - 1
+SCHEDULE_TAG = 0x52_4F_56_33
+VALIDATION_SEEDS = 5
+VALIDATION_GENOMES = 3
 
-# -- success criterion (partial delivery, section 6.3) --------------------------------------------------------------
-SUCCESS_MIN_FINISHES = 3  # a run succeeds when its best design is legal and finishes on at least 3 ...
-SUCCESS_OF_SEEDS = 5  # ... of 5 validation terrains; with another number of validation terrains the same share is
-# required, rounded up (``evolve.required_finishes``)
+SUCCESS_MIN_FINISHES = 3
+SUCCESS_OF_SEEDS = 5
 
-# -- recording (``replay.py``) -------------------------------------------------------------------------------------
-REPLAY_HZ = 10.0  # frames per simulated second, per rover
-REPLAY_MAX_FRAMES = 6000  # per rover: longer runs are thinned by a whole factor. A finisher needs ~590 s = 5900 frames
-# at 10 Hz, so finishers keep the full rate; only a rover that keeps creeping along for the 1556 s cap is thinned (to
-# ~4 Hz). This bounds a generation: 50 rovers x 6000 frames = 21.6 MB raw, 7.7 MB stored (measured with
-# real recorded frames, JSON included; see the storage note in ``replay``), the worst case of any preset. Typical: 0.3-0.8 MB
-# for a 12-rover generation.
-REPLAY_BEST_K = 5  # rovers per generation recorded by the "best" mode
+REPLAY_HZ = 10.0
+REPLAY_MAX_FRAMES = 6000
+REPLAY_BEST_K = 5

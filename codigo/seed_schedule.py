@@ -1,23 +1,23 @@
-"""The terrain seeds of one evolution run.
+"""
+seed_schedule.py: elige las semillas de terreno de una corrida.
 
-Terrain relief and sections are fixed; the seed only changes the rocks and the sub-metre roughness (``track_rocks``,
-``track_terrain``). A run uses
+Para qué existe
+    Cada generación se evalúa en terrenos distintos, para que el AG no se adapte a una sola disposición
+    de rocas, y al final se valida en terrenos que nunca vio. Este archivo decide esas semillas a partir
+    de la semilla de la corrida, así la corrida es reproducible.
 
-* ``seeds_per_generation`` TRAINING seeds per generation (1 by default here, 2 in the presets): every rover of a
-  generation is scored on all of them, so a rover cannot be evolved to one particular arrangement of rocks, and one
-  boulder that stops the whole population cannot make the selection of that generation blind, and
-* a few VALIDATION seeds, never used during the run, on which the best genomes are judged at the end.
+Qué contiene
+    - SeedSchedule: las semillas de entrenamiento de cada generación y las semillas de validación.
+    - SeedSchedule.for_run: arma las semillas de una corrida.
+    - seeds_for_generation: las semillas en las que se evalúa una generación (primero, la que se graba).
 
-Everything derives from the run seed alone (through ``numpy.random.SeedSequence``, in streams separate from the GA's
-own rng, which uses the run seed directly), so a run is reproducible and two runs with different seeds see different
-terrains. The training seeds are drawn one by one, so the seeds of the first generations do not depend on how many
-generations follow; validation seeds skip any value a training seed took, so they are disjoint by construction.
+Cómo funciona
+    La semilla solo cambia las rocas y la rugosidad fina; el relieve y las secciones son fijos. Las
+    semillas salen de numpy.random.SeedSequence, en flujos separados del generador del AG. Ninguna
+    semilla de entrenamiento se repite, y las de validación nunca coinciden con ellas.
 
-The FIRST seed of each generation (``training``, the seed that is recorded for replay) comes from the same stream as
-when a generation had a single seed, so a schedule with ``seeds_per_generation=1`` is exactly the one it always was, and
-the validation seeds are the same whatever the number of training seeds (runs stay comparable). The extra seeds of a
-generation come from a stream of their own. Every training seed differs from every other one (of any generation) and
-from every validation seed.
+Dónde encaja
+    Etapa: corrida. Usa evolution_params. Lo usa evolve.py.
 """
 
 from __future__ import annotations
@@ -49,10 +49,10 @@ def _draw(run_seed: int, purpose: int, count: int, taken: set[int]) -> tuple[int
 @dataclass(frozen=True)
 class SeedSchedule:
     run_seed: int
-    training: tuple[int, ...]  # the FIRST terrain seed of generation g is training[g] (the one recorded for replay)
-    validation: tuple[int, ...]  # unseen during the run
+    training: tuple[int, ...]
+    validation: tuple[int, ...]
     seeds_per_generation: int = 1
-    extra: tuple[tuple[int, ...], ...] = ()  # per generation, its seeds after the first (empty without extra seeds)
+    extra: tuple[tuple[int, ...], ...] = ()
 
     @classmethod
     def for_run(cls, run_seed: int, generations: int, validation_seeds: int = params.VALIDATION_SEEDS,
@@ -76,12 +76,10 @@ class SeedSchedule:
             raise IndexError(f"generation {generation} is outside this schedule ({len(self.training)} generations)")
 
     def for_generation(self, generation: int) -> int:
-        """The terrain seed of the generation that is recorded for replay: its first seed."""
         self._check(generation)
         return self.training[generation]
 
     def seeds_for_generation(self, generation: int) -> tuple[int, ...]:
-        """Every terrain seed the generation is scored on, the recorded one first."""
         self._check(generation)
         return (self.training[generation], *(self.extra[generation] if self.extra else ()))
 

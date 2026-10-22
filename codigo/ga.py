@@ -1,35 +1,28 @@
-"""A MuJoCo-free genetic algorithm for real-valued genomes in [0, 1] (`genome_spec.GENOME_LENGTH` genes), on DEAP.
+"""
+ga.py: el algoritmo genético, escrito con DEAP.
 
-The GA knows nothing about rovers: fitness comes from a pluggable batch evaluator, `evaluate(population) ->
-list[Evaluation]`, so the whole generation is simulated at once (one batch for the worker pool, see `evolve.py`).
+Para qué existe
+    Es el motor de búsqueda del TP. No sabe nada de rovers: recibe una función que puntúa una
+    generación entera y devuelve la población siguiente. Así el AG se puede probar sin el simulador
+    y el simulador se puede cambiar sin tocar el AG.
 
-DEAP (`deap.base`, `creator`, `tools`), the library of the course's demos, provides the individuals and the operators.
-Every operator is registered on a `base.Toolbox` (`make_toolbox`), so switching a method is one `toolbox.register(...)`
-line, as in the course's demo notebook:
+Qué contiene
+    - GAConfig: los métodos y parámetros del AG (por defecto, los de la Tabla 1 de la entrega parcial).
+    - make_toolbox: registra en DEAP la selección, el cruce y la mutación.
+    - next_generation: arma la generación siguiente (elitismo, selección, cruce, mutación y reflexión).
+    - run: repite ese ciclo durante todas las generaciones, de forma reproducible para cada semilla.
+    - RunLogger: guarda generations.csv, best_genomes.json y populations.npz de una corrida.
 
-- select: `tools.selTournament(tournsize=k)` (default) or roulette, `tools.selRoulette` on a shifted fitness
-  (`select_roulette`, because Deb's fitness is negative for illegal designs). Tournament pressure is one integer and
-  does not depend on the fitness scale, which matters because rover fitness has no natural normalisation.
-- mate: `tools.cxBlend(alpha=a)` = BLX-alpha (default; each child gene uniform in the parents' interval widened by
-  `alpha * |difference|` on each side; its exploration shrinks by itself as the population converges) or
-  `tools.cxUniform(indpb=p)` = binomial crossover (each gene swapped between the two children with probability p).
-  A selected pair is mated with probability `crossover_rate`.
-- mutate: `tools.mutGaussian(mu=0, sigma=s, indpb=mutation_gene_rate)`: each gene changes with a constant probability by
-  N(0, s), s in [0, 1] units (a fraction of each gene's physical range); s is passed per generation (adaptive).
+Cómo funciona
+    Selección por torneo (k = 3) o por ruleta; cruce BLX-α (α = 0.3) o binomial; mutación gaussiana
+    con un paso σ adaptativo, que crece de 0.1 a 0.3 a medida que la población pierde diversidad.
+    Después de cruzar y de mutar, cada gen se refleja dentro de [0, 1] en lugar de recortarse.
+    Los 2 mejores individuos pasan sin cambios a la generación siguiente.
 
-Explicit custom code, not DEAP's:
-
-- Reflection: after crossover and after mutation every gene is reflected back into [0, 1] (`reflect`), not clipped, so
-  genes do not pile up on 0 or 1.
-- Elitism: the best `elite_count` individuals are copied unchanged into the next generation. They are re-evaluated with
-  it, so an evaluator whose environment changes every generation (a new terrain seed) judges them afresh.
-- Adaptive mutation by convergence (`adaptive_sigma`): s_g = sigma_min + (sigma_max - sigma_min) * clip(1 - D_g / D_0,
-  0, 1), with D = `gene_std_diversity` (mean per-gene std) and D_0 the diversity of generation 0. A diverse population
-  explores with small steps; as it converges, the steps grow. With `adaptive_mutation=False`, s = sigma_min always.
-- Deb's feasibility fitness (`fitness.py`) is the scalar the GA maximises (`FitnessMax`, `weights=(1.0,)`).
-- Randomness: DEAP draws from Python's global `random` module. Each generation's operators run on a private stream
-  seeded from the run's numpy generator (`_python_random`), so a run is deterministic per seed and the caller's
-  `random` state is left as it was.
+Dónde encaja
+    Etapa: operadores y ciclo de generaciones. Usa genome_spec para el largo del genoma.
+    Lo usan evolve, baselines, fitness y replay. El notebook lo compara con su propio AG para
+    comprobar que ambos producen los mismos resultados.
 """
 
 from __future__ import annotations
@@ -52,29 +45,24 @@ from deap import base, creator, tools
 import genome_spec
 
 
-# --- configuration and types -----------------------------------------------------------------------------------
-
 SELECTION_METHODS = ("tournament", "roulette")
 CROSSOVER_METHODS = ("blx", "binomial")
-ROULETTE_EPSILON = 1e-6  # slice of the wheel left to the worst individual (see `select_roulette`)
+ROULETTE_EPSILON = 1e-6
 
 
 @dataclass(frozen=True)
 class GAConfig:
-    """Every GA method and parameter. The defaults are Tabla 1 of the partial delivery (N=30, tournament k=3, BLX-alpha
-    0.3 with p=0.9, gene rate 0.1, sigma 0.1-0.3 adaptive, elitism 2); generations and terrains belong to the run."""
-
     population_size: int = 30
     elite_count: int = 2
-    selection: str = "tournament"  # "tournament" (tools.selTournament) | "roulette" (tools.selRoulette, shifted)
+    selection: str = "tournament"
     tournament_size: int = 3
-    crossover: str = "blx"  # "blx" (tools.cxBlend) | "binomial" (tools.cxUniform)
-    crossover_rate: float = 0.9  # probability that a selected pair is mated
+    crossover: str = "blx"
+    crossover_rate: float = 0.9
     blx_alpha: float = 0.3
-    binomial_indpb: float = 0.5  # per-gene swap probability of the binomial crossover
-    mutation_gene_rate: float = 0.1  # per-gene mutation probability (constant)
-    mutation_sigma: float = 0.1  # sigma_min: the sigma of a diverse population, and the fixed sigma without adaptation
-    sigma_max: float = 0.3  # the sigma of a fully converged population
+    binomial_indpb: float = 0.5
+    mutation_gene_rate: float = 0.1
+    mutation_sigma: float = 0.1
+    sigma_max: float = 0.3
     adaptive_mutation: bool = True
     seed: int = 0
 
@@ -102,8 +90,6 @@ class GAConfig:
 
 @dataclass(frozen=True)
 class Evaluation:
-    """Result of evaluating one genome. `details` is free-form (distance, total violation, violation reasons, ...)."""
-
     fitness: float
     details: dict = field(default_factory=dict)
 
@@ -113,26 +99,21 @@ Evaluator = Callable[[np.ndarray], "list[Evaluation]"]
 
 @dataclass(frozen=True)
 class GAState:
-    """Adaptive-mutation state carried from generation to generation."""
-
     sigma: float
-    initial_diversity: float | None = None  # D_0, fixed by the first generation (None before it)
+    initial_diversity: float | None = None
 
     @classmethod
     def initial(cls, config: GAConfig) -> GAState:
         return cls(sigma=config.mutation_sigma)
 
 
-# --- DEAP: fitness, individuals, toolbox -----------------------------------------------------------------------
-
 if not hasattr(creator, "FitnessMax"):
-    creator.create("FitnessMax", base.Fitness, weights=(1.0,))  # one objective, maximised
+    creator.create("FitnessMax", base.Fitness, weights=(1.0,))
 if not hasattr(creator, "Individual"):
     creator.create("Individual", list, fitness=creator.FitnessMax)
 
 
 def _sane(fitness) -> np.ndarray:
-    """Fitness as floats; NaN/inf (a failed evaluation) becomes -inf so it never beats a finite one."""
     f = np.asarray(fitness, dtype=float)
     return np.where(np.isfinite(f), f, -np.inf)
 
@@ -142,8 +123,6 @@ def _fitness_array(evaluations) -> np.ndarray:
 
 
 def to_individuals(population: np.ndarray, fitness=None) -> list:
-    """DEAP individuals (`creator.Individual`, a list of floats) from the rows of `population`. `fitness` (one number
-    per row) becomes their fitness values; a non-finite (failed) value becomes -inf."""
     individuals = [creator.Individual(float(x) for x in row) for row in np.asarray(population, dtype=float)]
     if fitness is not None:
         for ind, f in zip(individuals, _sane(fitness)):
@@ -152,8 +131,6 @@ def to_individuals(population: np.ndarray, fitness=None) -> list:
 
 
 class _Slot:
-    """One individual on the roulette wheel, with its shifted fitness."""
-
     __slots__ = ("individual", "fitness")
 
     def __init__(self, individual, weight: float):
@@ -162,14 +139,6 @@ class _Slot:
 
 
 def select_roulette(individuals: list, k: int) -> list:
-    """Roulette-wheel selection (`tools.selRoulette`) on a SHIFTED fitness: `k` references to `individuals`.
-
-    `tools.selRoulette` needs positive fitness values, but Deb's feasibility fitness is negative for every illegal
-    design (`fitness.py`). So the wheel uses w_i = f_i - min_j f_j + ROULETTE_EPSILON, the minimum taken over the
-    finite values: the order is unchanged, the worst individual keeps a tiny slice, and equal fitness gives a uniform
-    wheel. A failed evaluation (non-finite fitness) gets no slice; if every evaluation failed the pick is uniform.
-    The shift changes the selection probabilities (they depend on the distance to the worst individual), which is
-    the usual windowing of roulette selection. The individuals' own fitness is not modified."""
     values = np.array([ind.fitness.values[0] for ind in individuals], dtype=float)
     finite = np.isfinite(values)
     if not finite.any():
@@ -177,15 +146,12 @@ def select_roulette(individuals: list, k: int) -> list:
     weights = np.where(finite, values - values[finite].min() + ROULETTE_EPSILON, 0.0)
     wheel = [_Slot(ind, float(w)) for ind, w in zip(individuals, weights)]
     chosen = tools.selRoulette(wheel, k)
-    while len(chosen) < k:  # a float rounding of the running sum can leave a spin unassigned: spin again
+    while len(chosen) < k:
         chosen += tools.selRoulette(wheel, k - len(chosen))
     return [slot.individual for slot in chosen]
 
 
 def make_toolbox(config: GAConfig) -> base.Toolbox:
-    """A DEAP toolbox with the configured operators: `select`, `mate`, `mutate` (call `mutate` with the generation's
-    `sigma=`). Switching a method is one `register` line, e.g. `toolbox.register("select", tools.selTournament,
-    tournsize=5)`; `run` and `next_generation` accept a toolbox changed that way."""
     toolbox = base.Toolbox()
     if config.selection == "tournament":
         toolbox.register("select", tools.selTournament, tournsize=config.tournament_size)
@@ -200,7 +166,6 @@ def make_toolbox(config: GAConfig) -> base.Toolbox:
 
 
 def _deap_version() -> str:
-    """The installed DEAP release (``deap.__version__`` only says the minor version)."""
     try:
         return metadata.version("deap")
     except metadata.PackageNotFoundError:
@@ -208,7 +173,6 @@ def _deap_version() -> str:
 
 
 def describe_operators(config: GAConfig) -> dict:
-    """The GA's methods in words, for a run's manifest (every run documents itself)."""
     if config.selection == "tournament":
         select = f"tools.selTournament(tournsize={config.tournament_size})"
     else:
@@ -233,8 +197,6 @@ def describe_operators(config: GAConfig) -> dict:
 
 @contextmanager
 def _python_random(seed: int):
-    """Run DEAP's operators (they draw from the global `random` module) on a private stream seeded with `seed`, and
-    give the caller's `random` state back afterwards."""
     saved = random.getstate()
     random.seed(seed)
     try:
@@ -243,10 +205,7 @@ def _python_random(seed: int):
         random.setstate(saved)
 
 
-# --- helpers ---------------------------------------------------------------------------------------------------
-
 def reflect(x: np.ndarray) -> np.ndarray:
-    """Fold values back into [0, 1] by reflecting at both borders (a triangle wave)."""
     t = np.mod(np.asarray(x, dtype=float), 2.0)
     return np.where(t > 1.0, 2.0 - t, t)
 
@@ -255,10 +214,7 @@ def _reflect_individual(individual) -> None:
     individual[:] = reflect(np.asarray(individual, dtype=float)).tolist()
 
 
-# --- population ------------------------------------------------------------------------------------------------
-
 def initial_population(config: GAConfig, rng: np.random.Generator, seeds: list[np.ndarray] | None = None) -> np.ndarray:
-    """Uniform random genomes; `seeds` (e.g. a Perseverance-like design) take the first rows, clipped to [0, 1]."""
     pop = rng.uniform(0.0, 1.0, size=(config.population_size, genome_spec.GENOME_LENGTH))
     seeds = list(seeds or [])
     if len(seeds) > config.population_size:
@@ -271,13 +227,7 @@ def initial_population(config: GAConfig, rng: np.random.Generator, seeds: list[n
     return pop
 
 
-# --- variation -------------------------------------------------------------------------------------------------
-
 def vary(parents: list, toolbox: base.Toolbox, config: GAConfig, sigma: float) -> list:
-    """Offspring of the selected `parents` (DEAP individuals): clones mated in consecutive pairs with probability
-    `crossover_rate` (an odd last one is not mated), then every clone mutated (`toolbox.mutate`, per-gene probability
-    from the toolbox, std `sigma`); genes are reflected into [0, 1] after each step. Draws from Python's `random`, as
-    DEAP does; the parents are not modified."""
     offspring = [toolbox.clone(p) for p in parents]
     for a, b in zip(offspring[::2], offspring[1::2]):
         if random.random() < config.crossover_rate:
@@ -290,12 +240,7 @@ def vary(parents: list, toolbox: base.Toolbox, config: GAConfig, sigma: float) -
     return offspring
 
 
-# --- adaptive mutation and diversity ---------------------------------------------------------------------------
-
 def adaptive_sigma(diversity: float, initial_diversity: float, config: GAConfig) -> float:
-    """sigma_min + (sigma_max - sigma_min) * clip(1 - D / D_0, 0, 1): sigma_min while the population is as diverse as
-    generation 0 (or more), sigma_max once it has collapsed to clones (also when D_0 is already 0). Without adaptive
-    mutation, sigma_min."""
     if not config.adaptive_mutation:
         return config.mutation_sigma
     convergence = 1.0 if initial_diversity <= 0 else float(np.clip(1.0 - diversity / initial_diversity, 0.0, 1.0))
@@ -303,20 +248,16 @@ def adaptive_sigma(diversity: float, initial_diversity: float, config: GAConfig)
 
 
 def update_state(state: GAState, population: np.ndarray, config: GAConfig) -> GAState:
-    """The sigma that breeds the next generation from `population` (the generation just evaluated). The first call
-    fixes D_0 = the diversity of that population."""
     diversity = gene_std_diversity(population)
     initial = diversity if state.initial_diversity is None else state.initial_diversity
     return GAState(sigma=adaptive_sigma(diversity, initial, config), initial_diversity=initial)
 
 
 def gene_std_diversity(population: np.ndarray) -> float:
-    """Mean over genes of the population standard deviation (0 for clones)."""
     return float(np.std(population, axis=0).mean())
 
 
 def mean_pairwise_distance(population: np.ndarray) -> float:
-    """Mean Euclidean distance over all distinct genome pairs (0 for fewer than two genomes)."""
     n = len(population)
     if n < 2:
         return 0.0
@@ -324,41 +265,35 @@ def mean_pairwise_distance(population: np.ndarray) -> float:
     return float(dist[np.triu_indices(n, k=1)].mean())
 
 
-# --- one generation --------------------------------------------------------------------------------------------
-
 def next_generation(population: np.ndarray, evaluations, config: GAConfig, state: GAState,
                     rng: np.random.Generator, toolbox: base.Toolbox | None = None) -> tuple[np.ndarray, GAState]:
-    """Elitism + `toolbox.select` + `vary` (crossover, Gaussian mutation, reflection). Returns (new population, new
-    state). `toolbox` defaults to `make_toolbox(config)`; DEAP's draws come from a stream seeded by `rng`."""
     if len(evaluations) != len(population):
         raise ValueError(f"expected {len(population)} evaluations, got {len(evaluations)}")
     toolbox = make_toolbox(config) if toolbox is None else toolbox
     new_state = update_state(state, population, config)
     individuals = to_individuals(population, _fitness_array(evaluations))
-    elites = tools.selBest(individuals, config.elite_count)  # copied unchanged; sorted() is stable: first wins ties
+    elites = tools.selBest(individuals, config.elite_count)
     with _python_random(int(rng.integers(2**63))):
         parents = toolbox.select(individuals, config.population_size - config.elite_count)
         children = vary(parents, toolbox, config, new_state.sigma)
     return np.array(elites + children, dtype=float).reshape(config.population_size, population.shape[1]), new_state
 
 
-# --- the loop --------------------------------------------------------------------------------------------------
-
 @dataclass(frozen=True)
 class GenerationRecord:
     generation: int
-    population: np.ndarray  # (N, L) genomes that were evaluated
-    fitness: np.ndarray  # (N,) raw fitness (NaN/inf kept as reported)
-    evaluations: tuple  # the N Evaluation objects
+    population: np.ndarray
+    fitness: np.ndarray
+    evaluations: tuple
     best_index: int
     best_fitness: float
     mean_fitness: float
     median_fitness: float
-    std_fitness: float  # statistics over finite fitness values only
-    diversity: float  # mean per-gene std
+    std_fitness: float
+    diversity: float
     pairwise_distance: float
-    sigma: float  # mutation sigma used to breed the next generation
-    elapsed: float  # seconds since the run started
+    sigma: float
+    elapsed: float
 
     @property
     def best_genome(self) -> np.ndarray:
@@ -376,7 +311,7 @@ class RunHistory:
 
     @property
     def best_record(self) -> GenerationRecord:
-        return max(self.records, key=lambda r: r.best_fitness)  # first record wins ties
+        return max(self.records, key=lambda r: r.best_fitness)
 
     @property
     def best_fitness(self) -> float:
@@ -400,16 +335,11 @@ def _make_record(generation, population, evaluations, state, elapsed) -> Generat
         pairwise_distance=mean_pairwise_distance(population), sigma=state.sigma, elapsed=elapsed)
 
 
-make_record = _make_record  # public name: a baseline (``baselines.py``) logs its batches with the GA's statistics
+make_record = _make_record
 
 
 def run(evaluate: Evaluator, config: GAConfig, generations: int, logger: RunLogger | None = None,
         seeds: list[np.ndarray] | None = None, toolbox: base.Toolbox | None = None) -> RunHistory:
-    """Evolve for `generations` generations (each evaluated exactly once, as one batch); deterministic per seed.
-
-    `toolbox` defaults to `make_toolbox(config)`. Nothing is cached between generations: elites are part of the next
-    population and are evaluated again with it, so an evaluator whose environment changes from generation to
-    generation (a new terrain seed) judges them afresh."""
     if generations < 1:
         raise ValueError(f"generations must be at least 1, got {generations}")
     toolbox = make_toolbox(config) if toolbox is None else toolbox
@@ -434,13 +364,10 @@ def run(evaluate: Evaluator, config: GAConfig, generations: int, logger: RunLogg
     return RunHistory(config=config, records=tuple(records))
 
 
-# --- logging ---------------------------------------------------------------------------------------------------
-
 CSV_COLUMNS = ["generation", "best", "mean", "median", "std", "diversity", "pairwise_distance", "mutation_sigma", "elapsed"]
 
 
 def _jsonable(obj):
-    """Recursively convert numpy/odd values to plain JSON types; non-finite floats become null."""
     if isinstance(obj, dict):
         return {str(k): _jsonable(v) for k, v in obj.items()}
     if isinstance(obj, (list, tuple, set)):
@@ -456,23 +383,10 @@ def _jsonable(obj):
     return str(obj)
 
 
-jsonable = _jsonable  # public name for the modules that write run files
+jsonable = _jsonable
 
 
 class RunLogger:
-    """Persists ONE run under `out_dir`; nothing is written outside it.
-
-    The directory is created (or an existing *empty* one accepted) when the logger is built: a non-empty directory
-    raises `FileExistsError`, so a run can never overwrite or mix with another one. The default is
-    `runs/<timestamp>` (`-2`, `-3`, ... when that name is taken). A logger serves a single run: its records must be
-    generations 0, 1, 2, ... in order, and feeding it a second run raises `ValueError`.
-
-    Files, refreshed after every generation so an interrupted run stays analysable:
-    - `generations.csv`: one row per generation (see `CSV_COLUMNS`)
-    - `best_genomes.json`: per generation the best genome, its decoded physical values and its evaluation details
-    - `populations.npz`: `populations` (G, N, L), `fitness` (G, N) and `sigma` (G,) for replay and analysis
-    """
-
     def __init__(self, out_dir: str | Path | None = None):
         self.out_dir = self._claim_directory(Path(out_dir)) if out_dir is not None else self._new_default_directory()
         self._best: list[dict] = []
@@ -495,7 +409,7 @@ class RunLogger:
         for n in range(1, 10_000):
             path = base / (stamp if n == 1 else f"{stamp}-{n}")
             try:
-                path.mkdir()  # atomic: the directory is ours or this raises
+                path.mkdir()
                 return path
             except FileExistsError:
                 continue
