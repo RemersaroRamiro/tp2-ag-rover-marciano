@@ -13,7 +13,7 @@ las reglas de factibilidad de Deb.
 
 | Carpeta o archivo | Qué contiene |
 |---|---|
-| `TP2_AG_Rover.ipynb` | El Algoritmo Genético completo, escrito con las secciones de la demo de la cátedra. Está guardado ya ejecutado con los resultados del informe. |
+| `TP2_AG_Rover.ipynb` | El Algoritmo Genético completo, explicado paso a paso en seis secciones. Está guardado ya ejecutado con los resultados del informe. |
 | `logs-corridas/` | Las corridas del informe: `generations.csv` (log por generación), `run.json` (configuración y validación) y los gráficos de aptitud y de diversidad de cada una. |
 | `codigo/` | El simulador (caja negra para el notebook) y el programa de terminal que generó las corridas, con los datos de la pista. Cada archivo empieza con una explicación en español de para qué existe. |
 | `pyproject.toml`, `uv.lock` | Dependencias: Python 3.12, DEAP, MuJoCo, NumPy y Matplotlib. |

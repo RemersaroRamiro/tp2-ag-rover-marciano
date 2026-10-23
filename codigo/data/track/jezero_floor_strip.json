@@ -63,7 +63,6 @@
     "start_x": 4590298.0,
     "y": 1093271.0,
     "center_row_index_in_strip": 30,
-    "note": "center row of the strip is the 2D demo's jezero_floor line (row index rows_y // 2)"
-  },
-  "command": "uv run --extra data python tools/extract_track.py"
+    "note": "center row of the strip is the line the track follows (row index rows_y // 2)"
+  }
 }
