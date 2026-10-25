@@ -7,7 +7,7 @@ Para qué existe
     y el simulador se puede cambiar sin tocar el AG.
 
 Qué contiene
-    - GAConfig: los métodos y parámetros del AG (por defecto, los de la Tabla 1 de la entrega parcial).
+    - GAConfig: los métodos y parámetros del AG (por defecto, los de la corrida base c1-base).
     - make_toolbox: registra en DEAP la selección, el cruce y la mutación.
     - next_generation: arma la generación siguiente (elitismo, selección, cruce, mutación y reflexión).
     - run: repite ese ciclo durante todas las generaciones, de forma reproducible para cada semilla.

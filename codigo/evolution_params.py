@@ -16,7 +16,7 @@ Qué contiene
       de un flujo aleatorio distinto del que usa el AG.
     - Validación y éxito: los VALIDATION_GENOMES = 3 mejores genomas se validan en VALIDATION_SEEDS = 5
       terrenos nunca vistos. Una corrida tiene éxito si su mejor diseño es válido y llega a la meta en
-      SUCCESS_MIN_FINISHES = 3 de SUCCESS_OF_SEEDS = 5 terrenos (entrega parcial, sección 6.3); con otra
+      SUCCESS_MIN_FINISHES = 3 de SUCCESS_OF_SEEDS = 5 terrenos; con otra
       cantidad de terrenos se exige la misma proporción, redondeada hacia arriba.
 
 Dónde encaja

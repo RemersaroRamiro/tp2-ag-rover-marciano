@@ -619,7 +619,7 @@ def build_parser() -> argparse.ArgumentParser:
                         "de sus mejores disenos en las mismas semillas de validacion. No acepta las opciones del AG ni "
                         "--seed-reference")
     d = ga.GAConfig()
-    g = p.add_argument_group("algoritmo genetico (DEAP; los valores por defecto son los de la Tabla 1 de la entrega parcial)")
+    g = p.add_argument_group("algoritmo genetico (DEAP; los valores por defecto son los de la corrida base c1-base)")
     g.add_argument("--selection", choices=ga.SELECTION_METHODS, default=d.selection,
                    help="seleccion: tournament = tools.selTournament, roulette = tools.selRoulette sobre la aptitud "
                         f"desplazada f - min(f) + eps (default: {d.selection})")

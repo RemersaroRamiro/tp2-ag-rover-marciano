@@ -12,7 +12,7 @@ Qué contiene
 
 Dónde encaja
     Etapa: resultados. Usa genome_spec. evolve.py valida PERSEVERANCE_LIKE en cada corrida como línea
-    de base (Tabla 4 de la entrega parcial). El notebook también lo importa.
+    de base. El notebook también lo importa.
 """
 
 from __future__ import annotations
