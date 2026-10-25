@@ -9,6 +9,13 @@ Cada individuo es un cromosoma de 15 genes reales en [0, 1]. La aptitud, que se 
 rover recorre en una simulación física (MuJoCo) sobre los terrenos de la generación. Las restricciones se tratan con
 las reglas de factibilidad de Deb.
 
+## Video
+
+https://github.com/user-attachments/assets/8bbe9b0d-7f06-4bfe-b936-95525c10cda5
+
+La corrida `c3-binomial` en 3D: la población de las generaciones 0, 15 y 29 recorriendo la pista y la evolución de la
+aptitud máxima. El visor 3D con el que se grabó no forma parte de este repositorio.
+
 ## Contenido
 
 | Carpeta o archivo | Qué contiene |
