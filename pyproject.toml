@@ -1,0 +1,19 @@
+[project]
+name = "tp2-ag-rover-marciano"
+version = "1.0.0"
+description = "TP2 IA (UTN FRBA): Algoritmo Genetico (DEAP) que evoluciona el diseno de un rover marciano, evaluado con simulacion fisica en MuJoCo"
+requires-python = ">=3.12"
+dependencies = [
+    "deap>=1.4.4",
+    "matplotlib>=3.11.2",
+    "mujoco>=3.2",
+    "numpy>=2.0",
+]
+
+[dependency-groups]
+dev = [
+    "ipykernel>=7.4.0",
+]
+
+[tool.uv]
+package = false

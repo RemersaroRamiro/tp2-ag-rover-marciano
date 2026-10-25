@@ -1,0 +1,2122 @@
+{
+  "status": "finished",
+  "kind": "random_search",
+  "run_seed": 1,
+  "started_at": "2026-10-20T21:50:38-03:00",
+  "finished_at": "2026-10-20T22:08:05-03:00",
+  "preset": {
+    "name": "normal",
+    "population": 30,
+    "generations": 30,
+    "seeds_per_generation": 2,
+    "description": "corrida normal de evolucion"
+  },
+  "random_search": {
+    "method": "random search: every batch is population genomes uniform in [0, 1] per gene; nothing is learnt from one batch to the next",
+    "designs_per_batch": 30,
+    "batches": 30,
+    "design_evaluations": 900,
+    "seeds_per_batch": 2,
+    "simulations": 1800,
+    "genomes": "numpy.random.default_rng(run seed), the GA's own stream: batch 0 is the GA's initial population (without --seed-reference)",
+    "training_seeds": "batch g is scored on the terrain seeds of GA generation g of the same run seed (seeds.training_per_generation), with the same fitness",
+    "validated": "the validation genomes best designs of all batches by training fitness (random_best = the best ever) and the reference design, on the run's validation seeds"
+  },
+  "seeds": {
+    "run_seed": 1,
+    "seeds_per_generation": 2,
+    "training": [
+      36586196,
+      871857110,
+      1150389016,
+      614306741,
+      1934250132,
+      307770617,
+      1060231680,
+      195183750,
+      157414891,
+      808230433,
+      806669865,
+      1926190098,
+      1376297835,
+      148634889,
+      1150663028,
+      1117971781,
+      1490541956,
+      1717638702,
+      28524507,
+      133741034,
+      1608970574,
+      1144584834,
+      245711410,
+      2096711932,
+      943166001,
+      881298316,
+      175496633,
+      170762025,
+      1689442280,
+      1672908937
+    ],
+    "training_per_generation": [
+      [
+        36586196,
+        1010487273
+      ],
+      [
+        871857110,
+        1136288230
+      ],
+      [
+        1150389016,
+        1865066814
+      ],
+      [
+        614306741,
+        726338991
+      ],
+      [
+        1934250132,
+        378963341
+      ],
+      [
+        307770617,
+        157663062
+      ],
+      [
+        1060231680,
+        1922768567
+      ],
+      [
+        195183750,
+        1025940914
+      ],
+      [
+        157414891,
+        993402062
+      ],
+      [
+        808230433,
+        109549704
+      ],
+      [
+        806669865,
+        238930515
+      ],
+      [
+        1926190098,
+        1937618492
+      ],
+      [
+        1376297835,
+        1704769467
+      ],
+      [
+        148634889,
+        1396847509
+      ],
+      [
+        1150663028,
+        1688976824
+      ],
+      [
+        1117971781,
+        1765887888
+      ],
+      [
+        1490541956,
+        1635584653
+      ],
+      [
+        1717638702,
+        463844455
+      ],
+      [
+        28524507,
+        509736806
+      ],
+      [
+        133741034,
+        1840323149
+      ],
+      [
+        1608970574,
+        58044588
+      ],
+      [
+        1144584834,
+        1779501342
+      ],
+      [
+        245711410,
+        1768221561
+      ],
+      [
+        2096711932,
+        1108172771
+      ],
+      [
+        943166001,
+        1835691973
+      ],
+      [
+        881298316,
+        1726304993
+      ],
+      [
+        175496633,
+        1573626568
+      ],
+      [
+        170762025,
+        965607387
+      ],
+      [
+        1689442280,
+        516874147
+      ],
+      [
+        1672908937,
+        1370744479
+      ]
+    ],
+    "validation": [
+      1302828960,
+      899894886,
+      1371778638,
+      1512735633,
+      1692859205
+    ]
+  },
+  "fitness": {
+    "rule": "Deb (2000) feasibility rules: a legal design beats an illegal one; legal designs by larger distance; illegal designs by smaller total violation. Legality is the design's: the same on every terrain seed",
+    "formula": "legal: fitness = mean over the generation's terrain seeds of max_distance_m (metres); illegal: fitness = -(infeasible_offset + total_violation), dimensionless, total_violation = sum(violation.magnitude)",
+    "seeds_per_generation": 2,
+    "infeasible_offset": 1.0
+  },
+  "eval_rules": {
+    "timestep_s": 0.0025,
+    "stuck_window_s": 20.0,
+    "stuck_progress_m": 0.2,
+    "max_sim_time_s": 1556.0543125440538,
+    "min_cruise_speed_mps": 0.3,
+    "time_margin": 1.25,
+    "cell_m": 0.25,
+    "spawn_x_m": 4.0,
+    "rock_window_m": 40.0
+  },
+  "validation_rules": {
+    "seeds": 5,
+    "genomes": 3
+  },
+  "genome_spec": {
+    "length": 15,
+    "hash": "7b87f0ab0879",
+    "genes": [
+      {
+        "name": "chassis_length_m",
+        "low": 1.5,
+        "high": 3.5,
+        "scale": "linear"
+      },
+      {
+        "name": "track_width_m",
+        "low": 1.5,
+        "high": 3.0,
+        "scale": "linear"
+      },
+      {
+        "name": "chassis_height_m",
+        "low": 0.3,
+        "high": 0.8,
+        "scale": "linear"
+      },
+      {
+        "name": "rocker_pivot_height_m",
+        "low": 0.4,
+        "high": 1.2,
+        "scale": "linear"
+      },
+      {
+        "name": "rocker_pivot_offset",
+        "low": -0.3,
+        "high": 0.3,
+        "scale": "linear"
+      },
+      {
+        "name": "rocker_front_arm_m",
+        "low": 0.5,
+        "high": 1.5,
+        "scale": "linear"
+      },
+      {
+        "name": "rocker_rear_arm_m",
+        "low": 0.3,
+        "high": 1.2,
+        "scale": "linear"
+      },
+      {
+        "name": "bogie_length_m",
+        "low": 0.4,
+        "high": 1.4,
+        "scale": "linear"
+      },
+      {
+        "name": "wheel_diameter_m",
+        "low": 0.3,
+        "high": 0.8,
+        "scale": "linear"
+      },
+      {
+        "name": "wheel_width_m",
+        "low": 0.1,
+        "high": 0.5,
+        "scale": "linear"
+      },
+      {
+        "name": "motor_peak_torque_nm",
+        "low": 15.0,
+        "high": 150.0,
+        "scale": "log"
+      },
+      {
+        "name": "battery_energy_wh",
+        "low": 500.0,
+        "high": 4000.0,
+        "scale": "log"
+      },
+      {
+        "name": "target_speed_mps",
+        "low": 0.3,
+        "high": 1.0,
+        "scale": "linear"
+      },
+      {
+        "name": "torque_limit_fraction",
+        "low": 0.3,
+        "high": 1.0,
+        "scale": "linear"
+      },
+      {
+        "name": "slope_brake",
+        "low": 0.0,
+        "high": 1.0,
+        "scale": "linear"
+      }
+    ]
+  },
+  "environment": {
+    "python": "3.12.8",
+    "mujoco": "3.14.0",
+    "numpy": "2.5.3",
+    "platform": "Windows-11-10.0.26200-SP0",
+    "cpu_count": 16,
+    "workers": 16
+  },
+  "generations": [
+    {
+      "generation": 0,
+      "terrain_seed": 36586196,
+      "terrain_seeds": [
+        36586196,
+        1010487273
+      ],
+      "best": 193.78574699973643,
+      "best_distance_m": 193.78574699973643,
+      "best_distances_m": [
+        63.71637396758675,
+        323.85512003188614
+      ],
+      "best_total_violation": 0.0,
+      "best_legal": true,
+      "best_status": "dead:stuck",
+      "best_statuses": [
+        "dead:stuck",
+        "dead:stuck"
+      ],
+      "best_section": "rock_field",
+      "best_sections": [
+        "rock_field",
+        "crater"
+      ],
+      "mean": 5.598893772393044,
+      "median": -1.3766329116611664,
+      "finished": 0,
+      "finished_by_seed": [
+        0,
+        0
+      ],
+      "legal": 2,
+      "stop_cluster_by_seed": [
+        0.26666666666666666,
+        0.23333333333333334
+      ],
+      "stop_cluster_scored": 0.2,
+      "diversity": 0.2783604375908767,
+      "sigma": null,
+      "eval_s": 33.50749779999023,
+      "elapsed_s": 33.51078149996465
+    },
+    {
+      "generation": 1,
+      "terrain_seed": 871857110,
+      "terrain_seeds": [
+        871857110,
+        1136288230
+      ],
+      "best": 42.772579576845416,
+      "best_distance_m": 42.772579576845416,
+      "best_distances_m": [
+        49.07586372306026,
+        36.469295430630574
+      ],
+      "best_total_violation": 0.0,
+      "best_legal": true,
+      "best_status": "dead:stuck",
+      "best_statuses": [
+        "dead:stuck",
+        "dead:stuck"
+      ],
+      "best_section": "rock_field",
+      "best_sections": [
+        "rock_field",
+        "rock_field"
+      ],
+      "mean": 0.7356338420689447,
+      "median": -1.2895330159321055,
+      "finished": 0,
+      "finished_by_seed": [
+        0,
+        0
+      ],
+      "legal": 3,
+      "stop_cluster_by_seed": [
+        0.16666666666666666,
+        0.26666666666666666
+      ],
+      "stop_cluster_scored": 0.16666666666666666,
+      "diversity": 0.28965524581483193,
+      "sigma": null,
+      "eval_s": 42.64735819998896,
+      "elapsed_s": 76.1697699999786
+    },
+    {
+      "generation": 2,
+      "terrain_seed": 1150389016,
+      "terrain_seeds": [
+        1150389016,
+        1865066814
+      ],
+      "best": 358.9067692933712,
+      "best_distance_m": 358.9067692933712,
+      "best_distances_m": [
+        351.2532201666774,
+        366.560318420065
+      ],
+      "best_total_violation": 0.0,
+      "best_legal": true,
+      "best_status": "dead:stuck",
+      "best_statuses": [
+        "dead:stuck",
+        "dead:stuck"
+      ],
+      "best_section": "climb",
+      "best_sections": [
+        "climb",
+        "climb"
+      ],
+      "mean": 13.66949612290228,
+      "median": -1.2144283967378686,
+      "finished": 0,
+      "finished_by_seed": [
+        0,
+        0
+      ],
+      "legal": 3,
+      "stop_cluster_by_seed": [
+        0.13333333333333333,
+        0.3
+      ],
+      "stop_cluster_scored": 0.2,
+      "diversity": 0.28207547187214055,
+      "sigma": null,
+      "eval_s": 32.98868690000381,
+      "elapsed_s": 109.16672699997434
+    },
+    {
+      "generation": 3,
+      "terrain_seed": 614306741,
+      "terrain_seeds": [
+        614306741,
+        726338991
+      ],
+      "best": 11.093306235582215,
+      "best_distance_m": 11.093306235582215,
+      "best_distances_m": [
+        15.842992248370798,
+        6.343620222793632
+      ],
+      "best_total_violation": 0.0,
+      "best_legal": true,
+      "best_status": "dead:stuck",
+      "best_statuses": [
+        "dead:stuck",
+        "dead:stuck"
+      ],
+      "best_section": "floor",
+      "best_sections": [
+        "floor",
+        "floor"
+      ],
+      "mean": -1.0138961907307704,
+      "median": -1.4236149204260626,
+      "finished": 0,
+      "finished_by_seed": [
+        0,
+        0
+      ],
+      "legal": 1,
+      "stop_cluster_by_seed": [
+        0.26666666666666666,
+        0.13333333333333333
+      ],
+      "stop_cluster_scored": 0.16666666666666666,
+      "diversity": 0.279570546783072,
+      "sigma": null,
+      "eval_s": 25.83847059996333,
+      "elapsed_s": 135.01417849998688
+    },
+    {
+      "generation": 4,
+      "terrain_seed": 1934250132,
+      "terrain_seeds": [
+        1934250132,
+        378963341
+      ],
+      "best": 57.04368539578357,
+      "best_distance_m": 57.04368539578357,
+      "best_distances_m": [
+        67.15417196531703,
+        46.9331988262501
+      ],
+      "best_total_violation": 0.0,
+      "best_legal": true,
+      "best_status": "dead:stuck",
+      "best_statuses": [
+        "dead:stuck",
+        "dead:stuck"
+      ],
+      "best_section": "rock_field",
+      "best_sections": [
+        "rock_field",
+        "rock_field"
+      ],
+      "mean": 1.6453429151489254,
+      "median": -1.30811685236238,
+      "finished": 0,
+      "finished_by_seed": [
+        0,
+        0
+      ],
+      "legal": 3,
+      "stop_cluster_by_seed": [
+        0.26666666666666666,
+        0.13333333333333333
+      ],
+      "stop_cluster_scored": 0.2,
+      "diversity": 0.2838312232074768,
+      "sigma": null,
+      "eval_s": 28.81527369999094,
+      "elapsed_s": 163.83680049999384
+    },
+    {
+      "generation": 5,
+      "terrain_seed": 307770617,
+      "terrain_seeds": [
+        307770617,
+        157663062
+      ],
+      "best": 335.7145957039326,
+      "best_distance_m": 335.7145957039326,
+      "best_distances_m": [
+        324.095299309921,
+        347.3338920979442
+      ],
+      "best_total_violation": 0.0,
+      "best_legal": true,
+      "best_status": "dead:stuck",
+      "best_statuses": [
+        "dead:stuck",
+        "dead:stuck"
+      ],
+      "best_section": "crater",
+      "best_sections": [
+        "crater",
+        "climb"
+      ],
+      "mean": 12.474309610396045,
+      "median": -1.3002490040717796,
+      "finished": 0,
+      "finished_by_seed": [
+        0,
+        0
+      ],
+      "legal": 3,
+      "stop_cluster_by_seed": [
+        0.23333333333333334,
+        0.23333333333333334
+      ],
+      "stop_cluster_scored": 0.23333333333333334,
+      "diversity": 0.28844095421237276,
+      "sigma": null,
+      "eval_s": 25.610772199986968,
+      "elapsed_s": 189.4572560999659
+    },
+    {
+      "generation": 6,
+      "terrain_seed": 1060231680,
+      "terrain_seeds": [
+        1060231680,
+        1922768567
+      ],
+      "best": 54.01968804311023,
+      "best_distance_m": 54.01968804311023,
+      "best_distances_m": [
+        49.31616086124138,
+        58.72321522497908
+      ],
+      "best_total_violation": 0.0,
+      "best_legal": true,
+      "best_status": "dead:stuck",
+      "best_statuses": [
+        "dead:stuck",
+        "dead:stuck"
+      ],
+      "best_section": "rock_field",
+      "best_sections": [
+        "rock_field",
+        "rock_field"
+      ],
+      "mean": 2.1172848098550245,
+      "median": -1.305246774796632,
+      "finished": 0,
+      "finished_by_seed": [
+        0,
+        0
+      ],
+      "legal": 2,
+      "stop_cluster_by_seed": [
+        0.26666666666666666,
+        0.23333333333333334
+      ],
+      "stop_cluster_scored": 0.13333333333333333,
+      "diversity": 0.29001687690191086,
+      "sigma": null,
+      "eval_s": 30.636141299968585,
+      "elapsed_s": 220.1014004999888
+    },
+    {
+      "generation": 7,
+      "terrain_seed": 195183750,
+      "terrain_seeds": [
+        195183750,
+        1025940914
+      ],
+      "best": -1.0323213747897495,
+      "best_distance_m": 142.8956518204205,
+      "best_distances_m": [
+        45.25750417850095,
+        240.53379946234008
+      ],
+      "best_total_violation": 0.03232137478974961,
+      "best_legal": false,
+      "best_status": "dead:stuck",
+      "best_statuses": [
+        "dead:stuck",
+        "dead:stuck"
+      ],
+      "best_section": "rock_field",
+      "best_sections": [
+        "rock_field",
+        "bedrock"
+      ],
+      "mean": -1.3293609058305338,
+      "median": -1.2869530087964942,
+      "finished": 0,
+      "finished_by_seed": [
+        0,
+        0
+      ],
+      "legal": 0,
+      "stop_cluster_by_seed": [
+        0.3,
+        0.13333333333333333
+      ],
+      "stop_cluster_scored": 0.13333333333333333,
+      "diversity": 0.2892492503967387,
+      "sigma": null,
+      "eval_s": 45.57123300002422,
+      "elapsed_s": 265.6826170999557
+    },
+    {
+      "generation": 8,
+      "terrain_seed": 157414891,
+      "terrain_seeds": [
+        157414891,
+        993402062
+      ],
+      "best": 364.50493566658156,
+      "best_distance_m": 364.50493566658156,
+      "best_distances_m": [
+        372.46046234222285,
+        356.5494089909402
+      ],
+      "best_total_violation": 0.0,
+      "best_legal": true,
+      "best_status": "dead:None",
+      "best_statuses": [
+        "finished",
+        "dead:stuck"
+      ],
+      "best_section": "climb",
+      "best_sections": [
+        "climb",
+        "climb"
+      ],
+      "mean": 12.673811023294974,
+      "median": -1.3269172114978913,
+      "finished": 0,
+      "finished_by_seed": [
+        1,
+        0
+      ],
+      "legal": 3,
+      "stop_cluster_by_seed": [
+        0.43333333333333335,
+        0.16666666666666666
+      ],
+      "stop_cluster_scored": 0.13333333333333333,
+      "diversity": 0.2828742475332673,
+      "sigma": null,
+      "eval_s": 41.48980500001926,
+      "elapsed_s": 307.1826897999854
+    },
+    {
+      "generation": 9,
+      "terrain_seed": 808230433,
+      "terrain_seeds": [
+        808230433,
+        109549704
+      ],
+      "best": 189.9888363113033,
+      "best_distance_m": 189.9888363113033,
+      "best_distances_m": [
+        57.22406222812479,
+        322.75361039448177
+      ],
+      "best_total_violation": 0.0,
+      "best_legal": true,
+      "best_status": "dead:stuck",
+      "best_statuses": [
+        "dead:stuck",
+        "dead:stuck"
+      ],
+      "best_section": "rock_field",
+      "best_sections": [
+        "rock_field",
+        "crater"
+      ],
+      "mean": 5.025460381036819,
+      "median": -1.3299978448422354,
+      "finished": 0,
+      "finished_by_seed": [
+        0,
+        0
+      ],
+      "legal": 1,
+      "stop_cluster_by_seed": [
+        0.26666666666666666,
+        0.43333333333333335
+      ],
+      "stop_cluster_scored": 0.2,
+      "diversity": 0.288453045167417,
+      "sigma": null,
+      "eval_s": 33.72292660002131,
+      "elapsed_s": 340.91507889999775
+    },
+    {
+      "generation": 10,
+      "terrain_seed": 806669865,
+      "terrain_seeds": [
+        806669865,
+        238930515
+      ],
+      "best": 28.874415043473405,
+      "best_distance_m": 28.874415043473405,
+      "best_distances_m": [
+        45.672192106124406,
+        12.076637980822404
+      ],
+      "best_total_violation": 0.0,
+      "best_legal": true,
+      "best_status": "dead:stuck",
+      "best_statuses": [
+        "dead:stuck",
+        "dead:stuck"
+      ],
+      "best_section": "rock_field",
+      "best_sections": [
+        "rock_field",
+        "floor"
+      ],
+      "mean": -0.3005216339390773,
+      "median": -1.2289841453281916,
+      "finished": 0,
+      "finished_by_seed": [
+        0,
+        0
+      ],
+      "legal": 1,
+      "stop_cluster_by_seed": [
+        0.16666666666666666,
+        0.43333333333333335
+      ],
+      "stop_cluster_scored": 0.13333333333333333,
+      "diversity": 0.2761255245483339,
+      "sigma": null,
+      "eval_s": 28.767433400033042,
+      "elapsed_s": 369.6921598999761
+    },
+    {
+      "generation": 11,
+      "terrain_seed": 1926190098,
+      "terrain_seeds": [
+        1926190098,
+        1937618492
+      ],
+      "best": -1.0068685228353067,
+      "best_distance_m": 184.30806299694075,
+      "best_distances_m": [
+        322.0655330778541,
+        46.55059291602736
+      ],
+      "best_total_violation": 0.006868522835306627,
+      "best_legal": false,
+      "best_status": "dead:stuck",
+      "best_statuses": [
+        "dead:stuck",
+        "dead:stuck"
+      ],
+      "best_section": "crater",
+      "best_sections": [
+        "crater",
+        "rock_field"
+      ],
+      "mean": -1.3525857763546112,
+      "median": -1.3410321248738892,
+      "finished": 0,
+      "finished_by_seed": [
+        0,
+        1
+      ],
+      "legal": 0,
+      "stop_cluster_by_seed": [
+        0.4,
+        0.13333333333333333
+      ],
+      "stop_cluster_scored": 0.3,
+      "diversity": 0.2784150772757563,
+      "sigma": null,
+      "eval_s": 32.42706319998251,
+      "elapsed_s": 402.12782459997106
+    },
+    {
+      "generation": 12,
+      "terrain_seed": 1376297835,
+      "terrain_seeds": [
+        1376297835,
+        1704769467
+      ],
+      "best": -1.0938449725542099,
+      "best_distance_m": 73.0853306566624,
+      "best_distances_m": [
+        57.5177704078784,
+        88.65289090544641
+      ],
+      "best_total_violation": 0.09384497255420989,
+      "best_legal": false,
+      "best_status": "dead:stuck",
+      "best_statuses": [
+        "dead:stuck",
+        "dead:stuck"
+      ],
+      "best_section": "rock_field",
+      "best_sections": [
+        "rock_field",
+        "rock_field"
+      ],
+      "mean": -1.4260866042263054,
+      "median": -1.429163993428614,
+      "finished": 0,
+      "finished_by_seed": [
+        0,
+        0
+      ],
+      "legal": 0,
+      "stop_cluster_by_seed": [
+        0.23333333333333334,
+        0.16666666666666666
+      ],
+      "stop_cluster_scored": 0.16666666666666666,
+      "diversity": 0.2938921599754428,
+      "sigma": null,
+      "eval_s": 34.47657669999171,
+      "elapsed_s": 436.6132843999658
+    },
+    {
+      "generation": 13,
+      "terrain_seed": 148634889,
+      "terrain_seeds": [
+        148634889,
+        1396847509
+      ],
+      "best": 49.292638663747944,
+      "best_distance_m": 49.292638663747944,
+      "best_distances_m": [
+        54.94352046099773,
+        43.641756866498156
+      ],
+      "best_total_violation": 0.0,
+      "best_legal": true,
+      "best_status": "dead:stuck",
+      "best_statuses": [
+        "dead:stuck",
+        "dead:stuck"
+      ],
+      "best_section": "rock_field",
+      "best_sections": [
+        "rock_field",
+        "rock_field"
+      ],
+      "mean": 2.1898218451029523,
+      "median": -1.2533069472825447,
+      "finished": 0,
+      "finished_by_seed": [
+        0,
+        0
+      ],
+      "legal": 3,
+      "stop_cluster_by_seed": [
+        0.16666666666666666,
+        0.3
+      ],
+      "stop_cluster_scored": 0.13333333333333333,
+      "diversity": 0.28411697190017315,
+      "sigma": null,
+      "eval_s": 34.640765300020576,
+      "elapsed_s": 471.2648573999759
+    },
+    {
+      "generation": 14,
+      "terrain_seed": 1150663028,
+      "terrain_seeds": [
+        1150663028,
+        1688976824
+      ],
+      "best": 186.82602164159624,
+      "best_distance_m": 186.82602164159624,
+      "best_distances_m": [
+        50.23065141388994,
+        323.42139186930257
+      ],
+      "best_total_violation": 0.0,
+      "best_legal": true,
+      "best_status": "dead:stuck",
+      "best_statuses": [
+        "dead:stuck",
+        "dead:stuck"
+      ],
+      "best_section": "rock_field",
+      "best_sections": [
+        "rock_field",
+        "crater"
+      ],
+      "mean": 4.881345184151916,
+      "median": -1.4085777514620372,
+      "finished": 0,
+      "finished_by_seed": [
+        1,
+        0
+      ],
+      "legal": 1,
+      "stop_cluster_by_seed": [
+        0.16666666666666666,
+        0.16666666666666666
+      ],
+      "stop_cluster_scored": 0.13333333333333333,
+      "diversity": 0.2848545032800412,
+      "sigma": null,
+      "eval_s": 37.75092120002955,
+      "elapsed_s": 509.0276821999578
+    },
+    {
+      "generation": 15,
+      "terrain_seed": 1117971781,
+      "terrain_seeds": [
+        1117971781,
+        1765887888
+      ],
+      "best": 59.02306307060353,
+      "best_distance_m": 59.02306307060353,
+      "best_distances_m": [
+        86.36314018817406,
+        31.68298595303299
+      ],
+      "best_total_violation": 0.0,
+      "best_legal": true,
+      "best_status": "dead:stuck",
+      "best_statuses": [
+        "dead:stuck",
+        "dead:stuck"
+      ],
+      "best_section": "rock_field",
+      "best_sections": [
+        "rock_field",
+        "floor"
+      ],
+      "mean": 0.6630500326830782,
+      "median": -1.3798344429074771,
+      "finished": 0,
+      "finished_by_seed": [
+        0,
+        0
+      ],
+      "legal": 1,
+      "stop_cluster_by_seed": [
+        0.2,
+        0.16666666666666666
+      ],
+      "stop_cluster_scored": 0.13333333333333333,
+      "diversity": 0.2826251402676493,
+      "sigma": null,
+      "eval_s": 45.99596649996238,
+      "elapsed_s": 555.0349308999721
+    },
+    {
+      "generation": 16,
+      "terrain_seed": 1490541956,
+      "terrain_seeds": [
+        1490541956,
+        1635584653
+      ],
+      "best": -1.041985851598929,
+      "best_distance_m": 4.690145997914286,
+      "best_distances_m": [
+        7.255287567234912,
+        2.125004428593658
+      ],
+      "best_total_violation": 0.04198585159892917,
+      "best_legal": false,
+      "best_status": "dead:stuck",
+      "best_statuses": [
+        "dead:stuck",
+        "dead:stuck"
+      ],
+      "best_section": "floor",
+      "best_sections": [
+        "floor",
+        "floor"
+      ],
+      "mean": -1.4460309765964992,
+      "median": -1.4332508876637138,
+      "finished": 0,
+      "finished_by_seed": [
+        0,
+        0
+      ],
+      "legal": 0,
+      "stop_cluster_by_seed": [
+        0.23333333333333334,
+        0.4666666666666667
+      ],
+      "stop_cluster_scored": 0.23333333333333334,
+      "diversity": 0.2853364567734796,
+      "sigma": null,
+      "eval_s": 21.344504199980292,
+      "elapsed_s": 576.3908302999916
+    },
+    {
+      "generation": 17,
+      "terrain_seed": 1717638702,
+      "terrain_seeds": [
+        1717638702,
+        463844455
+      ],
+      "best": 27.04478569638755,
+      "best_distance_m": 27.04478569638755,
+      "best_distances_m": [
+        36.741860251004056,
+        17.34771114177104
+      ],
+      "best_total_violation": 0.0,
+      "best_legal": true,
+      "best_status": "dead:stuck",
+      "best_statuses": [
+        "dead:stuck",
+        "dead:stuck"
+      ],
+      "best_section": "rock_field",
+      "best_sections": [
+        "rock_field",
+        "floor"
+      ],
+      "mean": 0.019651492013233195,
+      "median": -1.3864485614928796,
+      "finished": 0,
+      "finished_by_seed": [
+        0,
+        0
+      ],
+      "legal": 2,
+      "stop_cluster_by_seed": [
+        0.26666666666666666,
+        0.3
+      ],
+      "stop_cluster_scored": 0.16666666666666666,
+      "diversity": 0.28270632812662655,
+      "sigma": null,
+      "eval_s": 32.86823899997398,
+      "elapsed_s": 609.271288399992
+    },
+    {
+      "generation": 18,
+      "terrain_seed": 28524507,
+      "terrain_seeds": [
+        28524507,
+        509736806
+      ],
+      "best": 38.61367449105913,
+      "best_distance_m": 38.61367449105913,
+      "best_distances_m": [
+        16.68518049868768,
+        60.542168483430586
+      ],
+      "best_total_violation": 0.0,
+      "best_legal": true,
+      "best_status": "dead:stuck",
+      "best_statuses": [
+        "dead:stuck",
+        "dead:stuck"
+      ],
+      "best_section": "floor",
+      "best_sections": [
+        "floor",
+        "rock_field"
+      ],
+      "mean": 1.5863101181264028,
+      "median": -1.3657549584684845,
+      "finished": 0,
+      "finished_by_seed": [
+        0,
+        0
+      ],
+      "legal": 3,
+      "stop_cluster_by_seed": [
+        0.26666666666666666,
+        0.2
+      ],
+      "stop_cluster_scored": 0.13333333333333333,
+      "diversity": 0.2833861616509829,
+      "sigma": null,
+      "eval_s": 32.21081699995557,
+      "elapsed_s": 641.4942437999998
+    },
+    {
+      "generation": 19,
+      "terrain_seed": 133741034,
+      "terrain_seeds": [
+        133741034,
+        1840323149
+      ],
+      "best": -1.0296326862931509,
+      "best_distance_m": 28.98086688415393,
+      "best_distances_m": [
+        43.99656513687248,
+        13.965168631435375
+      ],
+      "best_total_violation": 0.02963268629315081,
+      "best_legal": false,
+      "best_status": "dead:stuck",
+      "best_statuses": [
+        "dead:stuck",
+        "dead:stuck"
+      ],
+      "best_section": "rock_field",
+      "best_sections": [
+        "rock_field",
+        "floor"
+      ],
+      "mean": -1.4089712781298724,
+      "median": -1.4103973374164638,
+      "finished": 0,
+      "finished_by_seed": [
+        0,
+        0
+      ],
+      "legal": 0,
+      "stop_cluster_by_seed": [
+        0.2,
+        0.2
+      ],
+      "stop_cluster_scored": 0.16666666666666666,
+      "diversity": 0.28063319409804305,
+      "sigma": null,
+      "eval_s": 32.6597163999686,
+      "elapsed_s": 674.1653243000037
+    },
+    {
+      "generation": 20,
+      "terrain_seed": 1608970574,
+      "terrain_seeds": [
+        1608970574,
+        58044588
+      ],
+      "best": 14.893881148226978,
+      "best_distance_m": 14.893881148226978,
+      "best_distances_m": [
+        18.89186093383743,
+        10.895901362616524
+      ],
+      "best_total_violation": 0.0,
+      "best_legal": true,
+      "best_status": "dead:stuck",
+      "best_statuses": [
+        "dead:stuck",
+        "dead:stuck"
+      ],
+      "best_section": "floor",
+      "best_sections": [
+        "floor",
+        "floor"
+      ],
+      "mean": -0.48344562984327866,
+      "median": -1.2755923486837624,
+      "finished": 0,
+      "finished_by_seed": [
+        0,
+        1
+      ],
+      "legal": 2,
+      "stop_cluster_by_seed": [
+        0.3,
+        0.23333333333333334
+      ],
+      "stop_cluster_scored": 0.13333333333333333,
+      "diversity": 0.29514307164134707,
+      "sigma": null,
+      "eval_s": 37.749841000011656,
+      "elapsed_s": 711.9282248999807
+    },
+    {
+      "generation": 21,
+      "terrain_seed": 1144584834,
+      "terrain_seeds": [
+        1144584834,
+        1779501342
+      ],
+      "best": 26.97193246940994,
+      "best_distance_m": 26.97193246940994,
+      "best_distances_m": [
+        41.847578914089766,
+        12.096286024730112
+      ],
+      "best_total_violation": 0.0,
+      "best_legal": true,
+      "best_status": "dead:stuck",
+      "best_statuses": [
+        "dead:stuck",
+        "dead:stuck"
+      ],
+      "best_section": "rock_field",
+      "best_sections": [
+        "rock_field",
+        "floor"
+      ],
+      "mean": -0.28329906521071346,
+      "median": -1.3772710345958434,
+      "finished": 0,
+      "finished_by_seed": [
+        0,
+        0
+      ],
+      "legal": 2,
+      "stop_cluster_by_seed": [
+        0.2,
+        0.2
+      ],
+      "stop_cluster_scored": 0.13333333333333333,
+      "diversity": 0.2834717886337247,
+      "sigma": null,
+      "eval_s": 29.231569099996705,
+      "elapsed_s": 741.1718001999543
+    },
+    {
+      "generation": 22,
+      "terrain_seed": 245711410,
+      "terrain_seeds": [
+        245711410,
+        1768221561
+      ],
+      "best": -1.0203656038146771,
+      "best_distance_m": 13.467521821640245,
+      "best_distances_m": [
+        19.74041523973526,
+        7.194628403545231
+      ],
+      "best_total_violation": 0.020365603814677197,
+      "best_legal": false,
+      "best_status": "dead:stuck",
+      "best_statuses": [
+        "dead:stuck",
+        "dead:stuck"
+      ],
+      "best_section": "floor",
+      "best_sections": [
+        "floor",
+        "floor"
+      ],
+      "mean": -1.3395462141346606,
+      "median": -1.3310349084656776,
+      "finished": 0,
+      "finished_by_seed": [
+        0,
+        0
+      ],
+      "legal": 0,
+      "stop_cluster_by_seed": [
+        0.23333333333333334,
+        0.3333333333333333
+      ],
+      "stop_cluster_scored": 0.13333333333333333,
+      "diversity": 0.27430321575830857,
+      "sigma": null,
+      "eval_s": 25.806848099979106,
+      "elapsed_s": 766.9900187999592
+    },
+    {
+      "generation": 23,
+      "terrain_seed": 2096711932,
+      "terrain_seeds": [
+        2096711932,
+        1108172771
+      ],
+      "best": 181.72924119922374,
+      "best_distance_m": 181.72924119922374,
+      "best_distances_m": [
+        40.57314331267619,
+        322.8853390857713
+      ],
+      "best_total_violation": 0.0,
+      "best_legal": true,
+      "best_status": "dead:stuck",
+      "best_statuses": [
+        "dead:stuck",
+        "dead:stuck"
+      ],
+      "best_section": "rock_field",
+      "best_sections": [
+        "rock_field",
+        "crater"
+      ],
+      "mean": 7.239896306328709,
+      "median": -1.3388381219658665,
+      "finished": 0,
+      "finished_by_seed": [
+        0,
+        0
+      ],
+      "legal": 3,
+      "stop_cluster_by_seed": [
+        0.13333333333333333,
+        0.3
+      ],
+      "stop_cluster_scored": 0.16666666666666666,
+      "diversity": 0.28522417255299254,
+      "sigma": null,
+      "eval_s": 44.477399400027934,
+      "elapsed_s": 811.4784773999709
+    },
+    {
+      "generation": 24,
+      "terrain_seed": 943166001,
+      "terrain_seeds": [
+        943166001,
+        1835691973
+      ],
+      "best": 181.59922611821355,
+      "best_distance_m": 181.59922611821355,
+      "best_distances_m": [
+        40.96258065537525,
+        322.23587158105187
+      ],
+      "best_total_violation": 0.0,
+      "best_legal": true,
+      "best_status": "dead:stuck",
+      "best_statuses": [
+        "dead:stuck",
+        "dead:stuck"
+      ],
+      "best_section": "rock_field",
+      "best_sections": [
+        "rock_field",
+        "crater"
+      ],
+      "mean": 9.073706134001391,
+      "median": -1.3537894176010896,
+      "finished": 0,
+      "finished_by_seed": [
+        0,
+        0
+      ],
+      "legal": 3,
+      "stop_cluster_by_seed": [
+        0.3,
+        0.16666666666666666
+      ],
+      "stop_cluster_scored": 0.1,
+      "diversity": 0.2773431426455765,
+      "sigma": null,
+      "eval_s": 36.5419402999687,
+      "elapsed_s": 848.0341675999807
+    },
+    {
+      "generation": 25,
+      "terrain_seed": 881298316,
+      "terrain_seeds": [
+        881298316,
+        1726304993
+      ],
+      "best": 56.16578600432101,
+      "best_distance_m": 56.16578600432101,
+      "best_distances_m": [
+        62.24569136485836,
+        50.08588064378367
+      ],
+      "best_total_violation": 0.0,
+      "best_legal": true,
+      "best_status": "dead:stuck",
+      "best_statuses": [
+        "dead:stuck",
+        "dead:stuck"
+      ],
+      "best_section": "rock_field",
+      "best_sections": [
+        "rock_field",
+        "rock_field"
+      ],
+      "mean": 0.5587041478393258,
+      "median": -1.3893099024040274,
+      "finished": 0,
+      "finished_by_seed": [
+        0,
+        0
+      ],
+      "legal": 1,
+      "stop_cluster_by_seed": [
+        0.16666666666666666,
+        0.23333333333333334
+      ],
+      "stop_cluster_scored": 0.13333333333333333,
+      "diversity": 0.2814505438238347,
+      "sigma": null,
+      "eval_s": 31.873250300006475,
+      "elapsed_s": 879.9199415000039
+    },
+    {
+      "generation": 26,
+      "terrain_seed": 175496633,
+      "terrain_seeds": [
+        175496633,
+        1573626568
+      ],
+      "best": 25.19889388802947,
+      "best_distance_m": 25.19889388802947,
+      "best_distances_m": [
+        37.52757168486398,
+        12.870216091194962
+      ],
+      "best_total_violation": 0.0,
+      "best_legal": true,
+      "best_status": "dead:stuck",
+      "best_statuses": [
+        "dead:stuck",
+        "dead:stuck"
+      ],
+      "best_section": "rock_field",
+      "best_sections": [
+        "rock_field",
+        "floor"
+      ],
+      "mean": -0.4912649884232855,
+      "median": -1.3214762650529865,
+      "finished": 0,
+      "finished_by_seed": [
+        0,
+        0
+      ],
+      "legal": 1,
+      "stop_cluster_by_seed": [
+        0.2,
+        0.3
+      ],
+      "stop_cluster_scored": 0.2,
+      "diversity": 0.2818749552389475,
+      "sigma": null,
+      "eval_s": 33.24437149998266,
+      "elapsed_s": 913.1770146999625
+    },
+    {
+      "generation": 27,
+      "terrain_seed": 170762025,
+      "terrain_seeds": [
+        170762025,
+        965607387
+      ],
+      "best": 350.4597488951379,
+      "best_distance_m": 350.4597488951379,
+      "best_distances_m": [
+        355.6736535398656,
+        345.24584425041024
+      ],
+      "best_total_violation": 0.0,
+      "best_legal": true,
+      "best_status": "dead:stuck",
+      "best_statuses": [
+        "dead:stuck",
+        "dead:stuck"
+      ],
+      "best_section": "climb",
+      "best_sections": [
+        "climb",
+        "climb"
+      ],
+      "mean": 24.051115095506916,
+      "median": -1.2876267781034194,
+      "finished": 0,
+      "finished_by_seed": [
+        0,
+        0
+      ],
+      "legal": 3,
+      "stop_cluster_by_seed": [
+        0.2,
+        0.1
+      ],
+      "stop_cluster_scored": 0.1,
+      "diversity": 0.28309863681030106,
+      "sigma": null,
+      "eval_s": 39.45349380001426,
+      "elapsed_s": 952.6426088999724
+    },
+    {
+      "generation": 28,
+      "terrain_seed": 1689442280,
+      "terrain_seeds": [
+        1689442280,
+        516874147
+      ],
+      "best": 125.4854100285696,
+      "best_distance_m": 125.4854100285696,
+      "best_distances_m": [
+        197.99980459595986,
+        52.971015461179356
+      ],
+      "best_total_violation": 0.0,
+      "best_legal": true,
+      "best_status": "dead:stuck",
+      "best_statuses": [
+        "dead:stuck",
+        "dead:stuck"
+      ],
+      "best_section": "soft_sand",
+      "best_sections": [
+        "soft_sand",
+        "rock_field"
+      ],
+      "mean": 5.370910058545509,
+      "median": -1.4134469311824027,
+      "finished": 0,
+      "finished_by_seed": [
+        0,
+        0
+      ],
+      "legal": 3,
+      "stop_cluster_by_seed": [
+        0.36666666666666664,
+        0.23333333333333334
+      ],
+      "stop_cluster_scored": 0.16666666666666666,
+      "diversity": 0.2877505899120295,
+      "sigma": null,
+      "eval_s": 24.659034900018014,
+      "elapsed_s": 977.3157979999669
+    },
+    {
+      "generation": 29,
+      "terrain_seed": 1672908937,
+      "terrain_seeds": [
+        1672908937,
+        1370744479
+      ],
+      "best": 53.42108261007351,
+      "best_distance_m": 53.42108261007351,
+      "best_distances_m": [
+        28.307929897774528,
+        78.5342353223725
+      ],
+      "best_total_violation": 0.0,
+      "best_legal": true,
+      "best_status": "dead:stuck",
+      "best_statuses": [
+        "dead:stuck",
+        "dead:stuck"
+      ],
+      "best_section": "floor",
+      "best_sections": [
+        "floor",
+        "rock_field"
+      ],
+      "mean": 0.41009801215596237,
+      "median": -1.4453495750347725,
+      "finished": 0,
+      "finished_by_seed": [
+        0,
+        0
+      ],
+      "legal": 1,
+      "stop_cluster_by_seed": [
+        0.43333333333333335,
+        0.36666666666666664
+      ],
+      "stop_cluster_scored": 0.16666666666666666,
+      "diversity": 0.28868672573314585,
+      "sigma": null,
+      "eval_s": 29.077379500027746,
+      "elapsed_s": 1006.4078320999979
+    }
+  ],
+  "validation": {
+    "seeds": [
+      1302828960,
+      899894886,
+      1371778638,
+      1512735633,
+      1692859205
+    ],
+    "candidates": [
+      {
+        "label": "random_best",
+        "genome": [
+          0.1965175663336678,
+          0.4185439502633219,
+          0.3193685561421232,
+          0.1329217208895931,
+          0.6168338315513925,
+          0.943238717728384,
+          0.03910428429470103,
+          0.770642093358219,
+          0.35300568906742513,
+          0.2715969442479642,
+          0.7938128323488172,
+          0.9316915339620815,
+          0.9816024369131277,
+          0.9331484537746048,
+          0.12457461939880843
+        ],
+        "decoded": {
+          "chassis_length_m": 1.8930351326673356,
+          "track_width_m": 2.127815925394983,
+          "chassis_height_m": 0.4596842780710616,
+          "rocker_pivot_height_m": 0.5063373767116744,
+          "rocker_pivot_offset": 0.07010029893083547,
+          "rocker_front_arm_m": 1.4432387177283839,
+          "rocker_rear_arm_m": 0.3351938558652309,
+          "bogie_length_m": 1.170642093358219,
+          "wheel_diameter_m": 0.47650284453371256,
+          "wheel_width_m": 0.2086387776991857,
+          "motor_peak_torque_nm": 93.30482258169488,
+          "battery_energy_wh": 3470.3341952521846,
+          "target_speed_mps": 0.9871217058391892,
+          "torque_limit_fraction": 0.9532039176422233,
+          "slope_brake": 0.12457461939880843
+        },
+        "training_fitness": 364.50493566658156,
+        "seeds": [
+          1302828960,
+          899894886,
+          1371778638,
+          1512735633,
+          1692859205
+        ],
+        "distances_m": [
+          369.13731951143154,
+          372.46098018915177,
+          325.0024734362399,
+          91.4713611533114,
+          296.4190581592527
+        ],
+        "fitness": [
+          369.13731951143154,
+          372.46098018915177,
+          325.0024734362399,
+          91.4713611533114,
+          296.4190581592527
+        ],
+        "statuses": [
+          "dead:stuck",
+          "finished",
+          "dead:stuck",
+          "dead:stuck",
+          "dead:stuck"
+        ],
+        "finished_by_seed": [
+          false,
+          true,
+          false,
+          false,
+          false
+        ],
+        "sections": [
+          "climb",
+          "climb",
+          "crater",
+          "rock_field",
+          "cross_slope"
+        ],
+        "finished": 1,
+        "mean_distance_m": 290.89823848987743,
+        "min_distance_m": 91.4713611533114,
+        "max_distance_m": 372.46098018915177,
+        "mean_fitness": 290.89823848987743,
+        "total_violation": 0.0,
+        "legal": true,
+        "violation_codes": []
+      },
+      {
+        "label": "random_2",
+        "genome": [
+          0.07341166691553269,
+          0.518521050809158,
+          0.026552023761241883,
+          0.15138617134312948,
+          0.028506414216959763,
+          0.8662414965178878,
+          0.32973821800273906,
+          0.5211312073463263,
+          0.7872579379890905,
+          0.688896824749785,
+          0.9263145604956078,
+          0.4898036887229915,
+          0.7024378150343941,
+          0.8677546688910042,
+          0.10719702303854828
+        ],
+        "decoded": {
+          "chassis_length_m": 1.6468233338310654,
+          "track_width_m": 2.2777815762137372,
+          "chassis_height_m": 0.31327601188062093,
+          "rocker_pivot_height_m": 0.5211089370745036,
+          "rocker_pivot_offset": -0.2828961514698241,
+          "rocker_front_arm_m": 1.3662414965178877,
+          "rocker_rear_arm_m": 0.5967643962024651,
+          "bogie_length_m": 0.9211312073463263,
+          "wheel_diameter_m": 0.6936289689945452,
+          "wheel_width_m": 0.375558729899914,
+          "motor_peak_torque_nm": 126.59187125125875,
+          "battery_energy_wh": 1384.5441571300018,
+          "target_speed_mps": 0.7917064705240757,
+          "torque_limit_fraction": 0.9074282682237029,
+          "slope_brake": 0.10719702303854828
+        },
+        "training_fitness": 358.9067692933712,
+        "seeds": [
+          1302828960,
+          899894886,
+          1371778638,
+          1512735633,
+          1692859205
+        ],
+        "distances_m": [
+          367.59387241315846,
+          358.94959146028566,
+          372.45774491352796,
+          372.4558891888288,
+          372.454651267871
+        ],
+        "fitness": [
+          367.59387241315846,
+          358.94959146028566,
+          372.45774491352796,
+          372.4558891888288,
+          372.454651267871
+        ],
+        "statuses": [
+          "dead:stuck",
+          "dead:stuck",
+          "finished",
+          "finished",
+          "finished"
+        ],
+        "finished_by_seed": [
+          false,
+          false,
+          true,
+          true,
+          true
+        ],
+        "sections": [
+          "climb",
+          "climb",
+          "climb",
+          "climb",
+          "climb"
+        ],
+        "finished": 3,
+        "mean_distance_m": 368.7823498487344,
+        "min_distance_m": 358.94959146028566,
+        "max_distance_m": 372.45774491352796,
+        "mean_fitness": 368.7823498487344,
+        "total_violation": 0.0,
+        "legal": true,
+        "violation_codes": []
+      },
+      {
+        "label": "random_3",
+        "genome": [
+          0.5316621837003113,
+          0.5869537409964034,
+          0.3804482788654554,
+          0.3107220758416416,
+          0.2348557370109834,
+          0.6962769982865862,
+          0.40505876210238156,
+          0.890816405528459,
+          0.18888287409755478,
+          0.1164215090388766,
+          0.8307160278067999,
+          0.1976920034467231,
+          0.5561437134008074,
+          0.9290430316968862,
+          0.5705129611089633
+        ],
+        "decoded": {
+          "chassis_length_m": 2.5633243674006225,
+          "track_width_m": 2.380430611494605,
+          "chassis_height_m": 0.4902241394327277,
+          "rocker_pivot_height_m": 0.6485776606733132,
+          "rocker_pivot_offset": -0.15908655779340997,
+          "rocker_front_arm_m": 1.1962769982865862,
+          "rocker_rear_arm_m": 0.6645528858921433,
+          "bogie_length_m": 1.2908164055284588,
+          "wheel_diameter_m": 0.3944414370487774,
+          "wheel_width_m": 0.14656860361555066,
+          "motor_peak_torque_nm": 101.57978443408815,
+          "battery_energy_wh": 754.2297749126427,
+          "target_speed_mps": 0.6893005993805652,
+          "torque_limit_fraction": 0.9503301221878202,
+          "slope_brake": 0.5705129611089633
+        },
+        "training_fitness": 350.4597488951379,
+        "seeds": [
+          1302828960,
+          899894886,
+          1371778638,
+          1512735633,
+          1692859205
+        ],
+        "distances_m": [
+          355.53809754103656,
+          324.76396795135304,
+          351.3337348982283,
+          81.1030635306028,
+          296.8051490955106
+        ],
+        "fitness": [
+          355.53809754103656,
+          324.76396795135304,
+          351.3337348982283,
+          81.1030635306028,
+          296.8051490955106
+        ],
+        "statuses": [
+          "dead:stuck",
+          "dead:stuck",
+          "dead:stuck",
+          "dead:stuck",
+          "dead:stuck"
+        ],
+        "finished_by_seed": [
+          false,
+          false,
+          false,
+          false,
+          false
+        ],
+        "sections": [
+          "climb",
+          "crater",
+          "climb",
+          "rock_field",
+          "cross_slope"
+        ],
+        "finished": 0,
+        "mean_distance_m": 281.9088026033463,
+        "min_distance_m": 81.1030635306028,
+        "max_distance_m": 355.53809754103656,
+        "mean_fitness": 281.9088026033463,
+        "total_violation": 0.0,
+        "legal": true,
+        "violation_codes": []
+      }
+    ],
+    "reference": {
+      "label": "reference",
+      "genome": [
+        0.25,
+        0.5333333333333332,
+        0.20000000000000007,
+        0.18750000000000006,
+        0.5,
+        0.7,
+        0.5555555555555556,
+        0.6000000000000001,
+        0.45000000000000007,
+        0.7500000000000001,
+        0.9030899869919436,
+        0.6666666666666666,
+        0.28571428571428575,
+        0.7142857142857143,
+        0.5
+      ],
+      "decoded": {
+        "chassis_length_m": 2.0,
+        "track_width_m": 2.3,
+        "chassis_height_m": 0.4,
+        "rocker_pivot_height_m": 0.55,
+        "rocker_pivot_offset": 0.0,
+        "rocker_front_arm_m": 1.2,
+        "rocker_rear_arm_m": 0.8,
+        "bogie_length_m": 1.0,
+        "wheel_diameter_m": 0.525,
+        "wheel_width_m": 0.4,
+        "motor_peak_torque_nm": 119.99999999999997,
+        "battery_energy_wh": 1999.9999999999998,
+        "target_speed_mps": 0.5,
+        "torque_limit_fraction": 0.8,
+        "slope_brake": 0.5
+      },
+      "training_fitness": null,
+      "seeds": [
+        1302828960,
+        899894886,
+        1371778638,
+        1512735633,
+        1692859205
+      ],
+      "distances_m": [
+        343.64486183726365,
+        324.33186087043197,
+        49.312238963952666,
+        42.088503353114085,
+        36.40054688682937
+      ],
+      "fitness": [
+        343.64486183726365,
+        324.33186087043197,
+        49.312238963952666,
+        42.088503353114085,
+        36.40054688682937
+      ],
+      "statuses": [
+        "dead:stuck",
+        "dead:stuck",
+        "dead:stuck",
+        "dead:stuck",
+        "dead:stuck"
+      ],
+      "finished_by_seed": [
+        false,
+        false,
+        false,
+        false,
+        false
+      ],
+      "sections": [
+        "climb",
+        "crater",
+        "rock_field",
+        "rock_field",
+        "rock_field"
+      ],
+      "finished": 0,
+      "mean_distance_m": 159.15560238231836,
+      "min_distance_m": 36.40054688682937,
+      "max_distance_m": 343.64486183726365,
+      "mean_fitness": 159.15560238231836,
+      "total_violation": 0.0,
+      "legal": true,
+      "violation_codes": []
+    }
+  },
+  "success": {
+    "criterion": "partial delivery, section 6.3: the best design is legal (feasible) and finishes on at least 3 of 5 validation terrains (with another number of validation terrains, the same share rounded up). The best design of a GA run is the final population's best (final_best); of a random search, its best design by training fitness (random_best)",
+    "required_finishes": 3,
+    "validation_seeds": 5,
+    "best": {
+      "label": "random_best",
+      "legal": true,
+      "finished": 1,
+      "seeds": 5,
+      "success": false
+    },
+    "top3": [
+      {
+        "label": "random_best",
+        "legal": true,
+        "finished": 1,
+        "seeds": 5,
+        "success": false
+      },
+      {
+        "label": "random_2",
+        "legal": true,
+        "finished": 3,
+        "seeds": 5,
+        "success": true
+      },
+      {
+        "label": "random_3",
+        "legal": true,
+        "finished": 0,
+        "seeds": 5,
+        "success": false
+      }
+    ],
+    "reference": {
+      "label": "reference",
+      "legal": true,
+      "finished": 0,
+      "seeds": 5,
+      "success": false
+    }
+  },
+  "final": {
+    "generation": 29,
+    "best_fitness": 364.50493566658156,
+    "best_genome": [
+      0.1965175663336678,
+      0.4185439502633219,
+      0.3193685561421232,
+      0.1329217208895931,
+      0.6168338315513925,
+      0.943238717728384,
+      0.03910428429470103,
+      0.770642093358219,
+      0.35300568906742513,
+      0.2715969442479642,
+      0.7938128323488172,
+      0.9316915339620815,
+      0.9816024369131277,
+      0.9331484537746048,
+      0.12457461939880843
+    ],
+    "best_details": {
+      "seed": 157414891,
+      "distance_m": 364.50493566658156,
+      "total_violation": 0.0,
+      "legal": true,
+      "violations": [],
+      "violation_codes": [],
+      "status": "finished",
+      "reason": null,
+      "finished": false,
+      "section_reached": "climb",
+      "alive_time_s": 429.35999999964577,
+      "drive_energy_wh": 51.07541973497064,
+      "net_drain_wh": 49.88275306719288,
+      "total_mass_kg": 1005.6605881153163,
+      "repairs": [
+        "rocker_rear_arm_m"
+      ],
+      "seeds": [
+        157414891,
+        993402062
+      ],
+      "distances_m": [
+        372.46046234222285,
+        356.5494089909402
+      ],
+      "min_distance_m": 356.5494089909402,
+      "max_distance_m": 372.46046234222285,
+      "finished_seeds": 1,
+      "per_seed": [
+        {
+          "seed": 157414891,
+          "distance_m": 372.46046234222285,
+          "status": "finished",
+          "reason": null,
+          "finished": true,
+          "section_reached": "climb",
+          "alive_time_s": 429.35999999964577
+        },
+        {
+          "seed": 993402062,
+          "distance_m": 356.5494089909402,
+          "status": "dead",
+          "reason": "stuck",
+          "finished": false,
+          "section_reached": "climb",
+          "alive_time_s": 424.0199999996506
+        }
+      ]
+    },
+    "best_ever_generation": 8,
+    "best_ever_fitness": 364.50493566658156
+  },
+  "timings": {
+    "total_s": 1046.794129899994,
+    "evaluation_s": 1006.0852960998891,
+    "per_generation_s": [
+      33.50749779999023,
+      42.64735819998896,
+      32.98868690000381,
+      25.83847059996333,
+      28.81527369999094,
+      25.610772199986968,
+      30.636141299968585,
+      45.57123300002422,
+      41.48980500001926,
+      33.72292660002131,
+      28.767433400033042,
+      32.42706319998251,
+      34.47657669999171,
+      34.640765300020576,
+      37.75092120002955,
+      45.99596649996238,
+      21.344504199980292,
+      32.86823899997398,
+      32.21081699995557,
+      32.6597163999686,
+      37.749841000011656,
+      29.231569099996705,
+      25.806848099979106,
+      44.477399400027934,
+      36.5419402999687,
+      31.873250300006475,
+      33.24437149998266,
+      39.45349380001426,
+      24.659034900018014,
+      29.077379500027746
+    ],
+    "validation_s": 40.24360799998976
+  }
+}

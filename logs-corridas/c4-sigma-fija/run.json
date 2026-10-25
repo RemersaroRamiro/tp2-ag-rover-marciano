@@ -1,0 +1,2222 @@
+{
+  "status": "finished",
+  "kind": "ga",
+  "run_seed": 1,
+  "started_at": "2026-10-19T20:11:03-03:00",
+  "finished_at": "2026-10-19T20:51:30-03:00",
+  "preset": {
+    "name": "normal",
+    "population": 30,
+    "generations": 30,
+    "seeds_per_generation": 2,
+    "description": "corrida normal de evolucion"
+  },
+  "seed_reference": false,
+  "ga": {
+    "population_size": 30,
+    "elite_count": 2,
+    "selection": "tournament",
+    "tournament_size": 3,
+    "crossover": "blx",
+    "crossover_rate": 0.9,
+    "blx_alpha": 0.3,
+    "binomial_indpb": 0.5,
+    "mutation_gene_rate": 0.1,
+    "mutation_sigma": 0.1,
+    "sigma_max": 0.3,
+    "adaptive_mutation": false,
+    "seed": 1
+  },
+  "ga_operators": {
+    "library": "DEAP 1.4.4",
+    "select": "tools.selTournament(tournsize=3)",
+    "mate": "tools.cxBlend(alpha=0.3) (BLX-alpha), a pair is mated with p=0.9",
+    "mutate": "tools.mutGaussian(mu=0, sigma=sigma_g, indpb=0.1)",
+    "sigma": "fixed: 0.1",
+    "elitism": "the 2 best copied unchanged (re-evaluated with every new generation)",
+    "bounds": "genes reflected into [0, 1] after crossover and after mutation"
+  },
+  "seeds": {
+    "run_seed": 1,
+    "seeds_per_generation": 2,
+    "training": [
+      36586196,
+      871857110,
+      1150389016,
+      614306741,
+      1934250132,
+      307770617,
+      1060231680,
+      195183750,
+      157414891,
+      808230433,
+      806669865,
+      1926190098,
+      1376297835,
+      148634889,
+      1150663028,
+      1117971781,
+      1490541956,
+      1717638702,
+      28524507,
+      133741034,
+      1608970574,
+      1144584834,
+      245711410,
+      2096711932,
+      943166001,
+      881298316,
+      175496633,
+      170762025,
+      1689442280,
+      1672908937
+    ],
+    "training_per_generation": [
+      [
+        36586196,
+        1010487273
+      ],
+      [
+        871857110,
+        1136288230
+      ],
+      [
+        1150389016,
+        1865066814
+      ],
+      [
+        614306741,
+        726338991
+      ],
+      [
+        1934250132,
+        378963341
+      ],
+      [
+        307770617,
+        157663062
+      ],
+      [
+        1060231680,
+        1922768567
+      ],
+      [
+        195183750,
+        1025940914
+      ],
+      [
+        157414891,
+        993402062
+      ],
+      [
+        808230433,
+        109549704
+      ],
+      [
+        806669865,
+        238930515
+      ],
+      [
+        1926190098,
+        1937618492
+      ],
+      [
+        1376297835,
+        1704769467
+      ],
+      [
+        148634889,
+        1396847509
+      ],
+      [
+        1150663028,
+        1688976824
+      ],
+      [
+        1117971781,
+        1765887888
+      ],
+      [
+        1490541956,
+        1635584653
+      ],
+      [
+        1717638702,
+        463844455
+      ],
+      [
+        28524507,
+        509736806
+      ],
+      [
+        133741034,
+        1840323149
+      ],
+      [
+        1608970574,
+        58044588
+      ],
+      [
+        1144584834,
+        1779501342
+      ],
+      [
+        245711410,
+        1768221561
+      ],
+      [
+        2096711932,
+        1108172771
+      ],
+      [
+        943166001,
+        1835691973
+      ],
+      [
+        881298316,
+        1726304993
+      ],
+      [
+        175496633,
+        1573626568
+      ],
+      [
+        170762025,
+        965607387
+      ],
+      [
+        1689442280,
+        516874147
+      ],
+      [
+        1672908937,
+        1370744479
+      ]
+    ],
+    "validation": [
+      1302828960,
+      899894886,
+      1371778638,
+      1512735633,
+      1692859205
+    ]
+  },
+  "fitness": {
+    "rule": "Deb (2000) feasibility rules: a legal design beats an illegal one; legal designs by larger distance; illegal designs by smaller total violation. Legality is the design's: the same on every terrain seed",
+    "formula": "legal: fitness = mean over the generation's terrain seeds of max_distance_m (metres); illegal: fitness = -(infeasible_offset + total_violation), dimensionless, total_violation = sum(violation.magnitude)",
+    "seeds_per_generation": 2,
+    "infeasible_offset": 1.0
+  },
+  "eval_rules": {
+    "timestep_s": 0.0025,
+    "stuck_window_s": 20.0,
+    "stuck_progress_m": 0.2,
+    "max_sim_time_s": 1556.0543125440538,
+    "min_cruise_speed_mps": 0.3,
+    "time_margin": 1.25,
+    "cell_m": 0.25,
+    "spawn_x_m": 4.0,
+    "rock_window_m": 40.0
+  },
+  "validation_rules": {
+    "seeds": 5,
+    "genomes": 3
+  },
+  "genome_spec": {
+    "length": 15,
+    "hash": "7b87f0ab0879",
+    "genes": [
+      {
+        "name": "chassis_length_m",
+        "low": 1.5,
+        "high": 3.5,
+        "scale": "linear"
+      },
+      {
+        "name": "track_width_m",
+        "low": 1.5,
+        "high": 3.0,
+        "scale": "linear"
+      },
+      {
+        "name": "chassis_height_m",
+        "low": 0.3,
+        "high": 0.8,
+        "scale": "linear"
+      },
+      {
+        "name": "rocker_pivot_height_m",
+        "low": 0.4,
+        "high": 1.2,
+        "scale": "linear"
+      },
+      {
+        "name": "rocker_pivot_offset",
+        "low": -0.3,
+        "high": 0.3,
+        "scale": "linear"
+      },
+      {
+        "name": "rocker_front_arm_m",
+        "low": 0.5,
+        "high": 1.5,
+        "scale": "linear"
+      },
+      {
+        "name": "rocker_rear_arm_m",
+        "low": 0.3,
+        "high": 1.2,
+        "scale": "linear"
+      },
+      {
+        "name": "bogie_length_m",
+        "low": 0.4,
+        "high": 1.4,
+        "scale": "linear"
+      },
+      {
+        "name": "wheel_diameter_m",
+        "low": 0.3,
+        "high": 0.8,
+        "scale": "linear"
+      },
+      {
+        "name": "wheel_width_m",
+        "low": 0.1,
+        "high": 0.5,
+        "scale": "linear"
+      },
+      {
+        "name": "motor_peak_torque_nm",
+        "low": 15.0,
+        "high": 150.0,
+        "scale": "log"
+      },
+      {
+        "name": "battery_energy_wh",
+        "low": 500.0,
+        "high": 4000.0,
+        "scale": "log"
+      },
+      {
+        "name": "target_speed_mps",
+        "low": 0.3,
+        "high": 1.0,
+        "scale": "linear"
+      },
+      {
+        "name": "torque_limit_fraction",
+        "low": 0.3,
+        "high": 1.0,
+        "scale": "linear"
+      },
+      {
+        "name": "slope_brake",
+        "low": 0.0,
+        "high": 1.0,
+        "scale": "linear"
+      }
+    ]
+  },
+  "environment": {
+    "python": "3.12.8",
+    "mujoco": "3.14.0",
+    "numpy": "2.5.3",
+    "platform": "Windows-11-10.0.26200-SP0",
+    "cpu_count": 16,
+    "workers": 16
+  },
+  "generations": [
+    {
+      "generation": 0,
+      "terrain_seed": 36586196,
+      "terrain_seeds": [
+        36586196,
+        1010487273
+      ],
+      "best": 193.78574699973643,
+      "best_distance_m": 193.78574699973643,
+      "best_distances_m": [
+        63.71637396758675,
+        323.85512003188614
+      ],
+      "best_total_violation": 0.0,
+      "best_legal": true,
+      "best_status": "dead:stuck",
+      "best_statuses": [
+        "dead:stuck",
+        "dead:stuck"
+      ],
+      "best_section": "rock_field",
+      "best_sections": [
+        "rock_field",
+        "crater"
+      ],
+      "mean": 5.598893772393044,
+      "median": -1.3766329116611664,
+      "finished": 0,
+      "finished_by_seed": [
+        0,
+        0
+      ],
+      "legal": 2,
+      "stop_cluster_by_seed": [
+        0.26666666666666666,
+        0.23333333333333334
+      ],
+      "stop_cluster_scored": 0.2,
+      "diversity": 0.2783604375908767,
+      "sigma": 0.1,
+      "eval_s": 32.9918764999602,
+      "elapsed_s": 32.99371650000103
+    },
+    {
+      "generation": 1,
+      "terrain_seed": 871857110,
+      "terrain_seeds": [
+        871857110,
+        1136288230
+      ],
+      "best": 67.45559952561518,
+      "best_distance_m": 67.45559952561518,
+      "best_distances_m": [
+        49.342293286571845,
+        85.56890576465852
+      ],
+      "best_total_violation": 0.0,
+      "best_legal": true,
+      "best_status": "dead:stuck",
+      "best_statuses": [
+        "dead:stuck",
+        "dead:stuck"
+      ],
+      "best_section": "rock_field",
+      "best_sections": [
+        "rock_field",
+        "rock_field"
+      ],
+      "mean": 6.352436960848962,
+      "median": -1.1292272744512442,
+      "finished": 0,
+      "finished_by_seed": [
+        0,
+        0
+      ],
+      "legal": 8,
+      "stop_cluster_by_seed": [
+        0.16666666666666666,
+        0.43333333333333335
+      ],
+      "stop_cluster_scored": 0.16666666666666666,
+      "diversity": 0.24528318814136713,
+      "sigma": 0.1,
+      "eval_s": 26.584808200015686,
+      "elapsed_s": 59.688945600006264
+    },
+    {
+      "generation": 2,
+      "terrain_seed": 1150389016,
+      "terrain_seeds": [
+        1150389016,
+        1865066814
+      ],
+      "best": 62.473594076563536,
+      "best_distance_m": 62.473594076563536,
+      "best_distances_m": [
+        62.224723426359844,
+        62.72246472676723
+      ],
+      "best_total_violation": 0.0,
+      "best_legal": true,
+      "best_status": "dead:stuck",
+      "best_statuses": [
+        "dead:stuck",
+        "dead:stuck"
+      ],
+      "best_section": "rock_field",
+      "best_sections": [
+        "rock_field",
+        "rock_field"
+      ],
+      "mean": 16.746545605307368,
+      "median": -1.012040398460703,
+      "finished": 0,
+      "finished_by_seed": [
+        0,
+        0
+      ],
+      "legal": 14,
+      "stop_cluster_by_seed": [
+        0.3,
+        0.43333333333333335
+      ],
+      "stop_cluster_scored": 0.2,
+      "diversity": 0.19649405087938332,
+      "sigma": 0.1,
+      "eval_s": 19.18139769998379,
+      "elapsed_s": 78.97326150001027
+    },
+    {
+      "generation": 3,
+      "terrain_seed": 614306741,
+      "terrain_seeds": [
+        614306741,
+        726338991
+      ],
+      "best": 323.6332076370345,
+      "best_distance_m": 323.6332076370345,
+      "best_distances_m": [
+        324.1097436183573,
+        323.15667165571165
+      ],
+      "best_total_violation": 0.0,
+      "best_legal": true,
+      "best_status": "dead:stuck",
+      "best_statuses": [
+        "dead:stuck",
+        "dead:stuck"
+      ],
+      "best_section": "crater",
+      "best_sections": [
+        "crater",
+        "crater"
+      ],
+      "mean": 63.692491616002634,
+      "median": 46.12839431897795,
+      "finished": 0,
+      "finished_by_seed": [
+        0,
+        1
+      ],
+      "legal": 22,
+      "stop_cluster_by_seed": [
+        0.5,
+        0.16666666666666666
+      ],
+      "stop_cluster_scored": 0.1,
+      "diversity": 0.1465252554657889,
+      "sigma": 0.1,
+      "eval_s": 39.94092359999195,
+      "elapsed_s": 119.01726550003514
+    },
+    {
+      "generation": 4,
+      "terrain_seed": 1934250132,
+      "terrain_seeds": [
+        1934250132,
+        378963341
+      ],
+      "best": 185.71229718694556,
+      "best_distance_m": 185.71229718694556,
+      "best_distances_m": [
+        324.1407205607573,
+        47.28387381313381
+      ],
+      "best_total_violation": 0.0,
+      "best_legal": true,
+      "best_status": "dead:stuck",
+      "best_statuses": [
+        "dead:stuck",
+        "dead:stuck"
+      ],
+      "best_section": "crater",
+      "best_sections": [
+        "crater",
+        "rock_field"
+      ],
+      "mean": 52.32282936283839,
+      "median": 48.24473359118756,
+      "finished": 0,
+      "finished_by_seed": [
+        0,
+        0
+      ],
+      "legal": 27,
+      "stop_cluster_by_seed": [
+        0.3333333333333333,
+        0.6333333333333333
+      ],
+      "stop_cluster_scored": 0.26666666666666666,
+      "diversity": 0.12862051613961514,
+      "sigma": 0.1,
+      "eval_s": 25.92592439998407,
+      "elapsed_s": 145.06726540002273
+    },
+    {
+      "generation": 5,
+      "terrain_seed": 307770617,
+      "terrain_seeds": [
+        307770617,
+        157663062
+      ],
+      "best": 323.1525171329586,
+      "best_distance_m": 323.1525171329586,
+      "best_distances_m": [
+        323.1079568779949,
+        323.1970773879223
+      ],
+      "best_total_violation": 0.0,
+      "best_legal": true,
+      "best_status": "dead:stuck",
+      "best_statuses": [
+        "dead:stuck",
+        "dead:stuck"
+      ],
+      "best_section": "crater",
+      "best_sections": [
+        "crater",
+        "crater"
+      ],
+      "mean": 122.65456414293668,
+      "median": 116.99780687956621,
+      "finished": 0,
+      "finished_by_seed": [
+        0,
+        0
+      ],
+      "legal": 26,
+      "stop_cluster_by_seed": [
+        0.4666666666666667,
+        0.3333333333333333
+      ],
+      "stop_cluster_scored": 0.3,
+      "diversity": 0.10035408311870155,
+      "sigma": 0.1,
+      "eval_s": 56.11321899999166,
+      "elapsed_s": 201.3240203000023
+    },
+    {
+      "generation": 6,
+      "terrain_seed": 1060231680,
+      "terrain_seeds": [
+        1060231680,
+        1922768567
+      ],
+      "best": 334.19888715434445,
+      "best_distance_m": 334.19888715434445,
+      "best_distances_m": [
+        323.27978602195975,
+        345.11798828672914
+      ],
+      "best_total_violation": 0.0,
+      "best_legal": true,
+      "best_status": "dead:stuck",
+      "best_statuses": [
+        "dead:stuck",
+        "dead:stuck"
+      ],
+      "best_section": "crater",
+      "best_sections": [
+        "crater",
+        "climb"
+      ],
+      "mean": 218.61127672102882,
+      "median": 198.66865604268762,
+      "finished": 0,
+      "finished_by_seed": [
+        0,
+        0
+      ],
+      "legal": 29,
+      "stop_cluster_by_seed": [
+        0.6333333333333333,
+        0.4
+      ],
+      "stop_cluster_scored": 0.3333333333333333,
+      "diversity": 0.08694056584896645,
+      "sigma": 0.1,
+      "eval_s": 82.38410170003772,
+      "elapsed_s": 284.0042710000416
+    },
+    {
+      "generation": 7,
+      "terrain_seed": 195183750,
+      "terrain_seeds": [
+        195183750,
+        1025940914
+      ],
+      "best": 335.3369577324071,
+      "best_distance_m": 335.3369577324071,
+      "best_distances_m": [
+        323.6214329171052,
+        347.05248254770896
+      ],
+      "best_total_violation": 0.0,
+      "best_legal": true,
+      "best_status": "dead:stuck",
+      "best_statuses": [
+        "dead:stuck",
+        "dead:stuck"
+      ],
+      "best_section": "crater",
+      "best_sections": [
+        "crater",
+        "climb"
+      ],
+      "mean": 206.85935031105925,
+      "median": 202.23201502935257,
+      "finished": 0,
+      "finished_by_seed": [
+        0,
+        0
+      ],
+      "legal": 28,
+      "stop_cluster_by_seed": [
+        0.4,
+        0.4
+      ],
+      "stop_cluster_scored": 0.2,
+      "diversity": 0.08507593952786743,
+      "sigma": 0.1,
+      "eval_s": 81.68825499998638,
+      "elapsed_s": 366.0509130000137
+    },
+    {
+      "generation": 8,
+      "terrain_seed": 157414891,
+      "terrain_seeds": [
+        157414891,
+        993402062
+      ],
+      "best": 355.12706181108183,
+      "best_distance_m": 355.12706181108183,
+      "best_distances_m": [
+        359.66551601105994,
+        350.5886076111038
+      ],
+      "best_total_violation": 0.0,
+      "best_legal": true,
+      "best_status": "dead:stuck",
+      "best_statuses": [
+        "dead:stuck",
+        "dead:stuck"
+      ],
+      "best_section": "climb",
+      "best_sections": [
+        "climb",
+        "climb"
+      ],
+      "mean": 308.3071201663851,
+      "median": 323.7230656810769,
+      "finished": 0,
+      "finished_by_seed": [
+        0,
+        0
+      ],
+      "legal": 30,
+      "stop_cluster_by_seed": [
+        0.9,
+        0.8333333333333334
+      ],
+      "stop_cluster_scored": 0.8333333333333334,
+      "diversity": 0.0742784371819661,
+      "sigma": 0.1,
+      "eval_s": 106.77160919999005,
+      "elapsed_s": 473.0909868000308
+    },
+    {
+      "generation": 9,
+      "terrain_seed": 808230433,
+      "terrain_seeds": [
+        808230433,
+        109549704
+      ],
+      "best": 360.65660331520246,
+      "best_distance_m": 360.65660331520246,
+      "best_distances_m": [
+        353.83610103843245,
+        367.47710559197253
+      ],
+      "best_total_violation": 0.0,
+      "best_legal": true,
+      "best_status": "dead:stuck",
+      "best_statuses": [
+        "dead:stuck",
+        "dead:stuck"
+      ],
+      "best_section": "climb",
+      "best_sections": [
+        "climb",
+        "climb"
+      ],
+      "mean": 232.79538725429308,
+      "median": 264.3229664000408,
+      "finished": 0,
+      "finished_by_seed": [
+        0,
+        0
+      ],
+      "legal": 29,
+      "stop_cluster_by_seed": [
+        0.5,
+        0.36666666666666664
+      ],
+      "stop_cluster_scored": 0.26666666666666666,
+      "diversity": 0.07470195293294553,
+      "sigma": 0.1,
+      "eval_s": 92.72660120000364,
+      "elapsed_s": 566.2819530999986
+    },
+    {
+      "generation": 10,
+      "terrain_seed": 806669865,
+      "terrain_seeds": [
+        806669865,
+        238930515
+      ],
+      "best": 353.07690651156236,
+      "best_distance_m": 353.07690651156236,
+      "best_distances_m": [
+        349.00477457880015,
+        357.14903844432456
+      ],
+      "best_total_violation": 0.0,
+      "best_legal": true,
+      "best_status": "dead:stuck",
+      "best_statuses": [
+        "dead:stuck",
+        "dead:stuck"
+      ],
+      "best_section": "climb",
+      "best_sections": [
+        "climb",
+        "climb"
+      ],
+      "mean": 233.07927453581624,
+      "median": 323.95893007485085,
+      "finished": 0,
+      "finished_by_seed": [
+        0,
+        0
+      ],
+      "legal": 25,
+      "stop_cluster_by_seed": [
+        0.36666666666666664,
+        0.5
+      ],
+      "stop_cluster_scored": 0.26666666666666666,
+      "diversity": 0.07830740939129092,
+      "sigma": 0.1,
+      "eval_s": 95.81641430000309,
+      "elapsed_s": 662.4804872000241
+    },
+    {
+      "generation": 11,
+      "terrain_seed": 1926190098,
+      "terrain_seeds": [
+        1926190098,
+        1937618492
+      ],
+      "best": 348.0444445602276,
+      "best_distance_m": 348.0444445602276,
+      "best_distances_m": [
+        349.6671794787891,
+        346.4217096416661
+      ],
+      "best_total_violation": 0.0,
+      "best_legal": true,
+      "best_status": "dead:stuck",
+      "best_statuses": [
+        "dead:stuck",
+        "dead:stuck"
+      ],
+      "best_section": "climb",
+      "best_sections": [
+        "climb",
+        "climb"
+      ],
+      "mean": 281.32790255715344,
+      "median": 323.41119381134274,
+      "finished": 0,
+      "finished_by_seed": [
+        0,
+        0
+      ],
+      "legal": 30,
+      "stop_cluster_by_seed": [
+        0.7666666666666667,
+        0.5
+      ],
+      "stop_cluster_scored": 0.4666666666666667,
+      "diversity": 0.06786234857137093,
+      "sigma": 0.1,
+      "eval_s": 97.23625109996647,
+      "elapsed_s": 760.0996918000164
+    },
+    {
+      "generation": 12,
+      "terrain_seed": 1376297835,
+      "terrain_seeds": [
+        1376297835,
+        1704769467
+      ],
+      "best": 349.52702916940535,
+      "best_distance_m": 349.52702916940535,
+      "best_distances_m": [
+        346.06566396624436,
+        352.98839437256635
+      ],
+      "best_total_violation": 0.0,
+      "best_legal": true,
+      "best_status": "dead:stuck",
+      "best_statuses": [
+        "dead:stuck",
+        "dead:stuck"
+      ],
+      "best_section": "climb",
+      "best_sections": [
+        "climb",
+        "climb"
+      ],
+      "mean": 255.24472956149268,
+      "median": 324.130076858737,
+      "finished": 0,
+      "finished_by_seed": [
+        0,
+        0
+      ],
+      "legal": 29,
+      "stop_cluster_by_seed": [
+        0.4,
+        0.36666666666666664
+      ],
+      "stop_cluster_scored": 0.26666666666666666,
+      "diversity": 0.05965388857897778,
+      "sigma": 0.1,
+      "eval_s": 86.01492430001963,
+      "elapsed_s": 846.5516329000238
+    },
+    {
+      "generation": 13,
+      "terrain_seed": 148634889,
+      "terrain_seeds": [
+        148634889,
+        1396847509
+      ],
+      "best": 371.93591650979835,
+      "best_distance_m": 371.93591650979835,
+      "best_distances_m": [
+        371.4130358107608,
+        372.4587972088359
+      ],
+      "best_total_violation": 0.0,
+      "best_legal": true,
+      "best_status": "dead:stuck",
+      "best_statuses": [
+        "dead:stuck",
+        "finished"
+      ],
+      "best_section": "climb",
+      "best_sections": [
+        "climb",
+        "climb"
+      ],
+      "mean": 186.5618352793407,
+      "median": 208.42574584780021,
+      "finished": 0,
+      "finished_by_seed": [
+        0,
+        7
+      ],
+      "legal": 28,
+      "stop_cluster_by_seed": [
+        0.8666666666666667,
+        0.3
+      ],
+      "stop_cluster_scored": 0.3333333333333333,
+      "diversity": 0.06044538854941369,
+      "sigma": 0.1,
+      "eval_s": 69.53428290004376,
+      "elapsed_s": 916.4896520000184
+    },
+    {
+      "generation": 14,
+      "terrain_seed": 1150663028,
+      "terrain_seeds": [
+        1150663028,
+        1688976824
+      ],
+      "best": 347.8938462653339,
+      "best_distance_m": 347.8938462653339,
+      "best_distances_m": [
+        371.9470862506334,
+        323.84060628003436
+      ],
+      "best_total_violation": 0.0,
+      "best_legal": true,
+      "best_status": "dead:stuck",
+      "best_statuses": [
+        "dead:stuck",
+        "dead:stuck"
+      ],
+      "best_section": "climb",
+      "best_sections": [
+        "climb",
+        "crater"
+      ],
+      "mean": 220.25390766363515,
+      "median": 189.34061738328154,
+      "finished": 0,
+      "finished_by_seed": [
+        0,
+        3
+      ],
+      "legal": 30,
+      "stop_cluster_by_seed": [
+        0.4666666666666667,
+        0.8333333333333334
+      ],
+      "stop_cluster_scored": 0.5,
+      "diversity": 0.05564252417626402,
+      "sigma": 0.1,
+      "eval_s": 73.14939979999326,
+      "elapsed_s": 989.7805406000116
+    },
+    {
+      "generation": 15,
+      "terrain_seed": 1117971781,
+      "terrain_seeds": [
+        1117971781,
+        1765887888
+      ],
+      "best": 372.4597323920158,
+      "best_distance_m": 372.4597323920158,
+      "best_distances_m": [
+        372.4589172279507,
+        372.4605475560809
+      ],
+      "best_total_violation": 0.0,
+      "best_legal": true,
+      "best_status": "finished",
+      "best_statuses": [
+        "finished",
+        "finished"
+      ],
+      "best_section": "climb",
+      "best_sections": [
+        "climb",
+        "climb"
+      ],
+      "mean": 306.0810280378294,
+      "median": 353.47488009204693,
+      "finished": 2,
+      "finished_by_seed": [
+        6,
+        3
+      ],
+      "legal": 29,
+      "stop_cluster_by_seed": [
+        0.23333333333333334,
+        0.3333333333333333
+      ],
+      "stop_cluster_scored": 0.23333333333333334,
+      "diversity": 0.05665391847399185,
+      "sigma": 0.1,
+      "eval_s": 108.38578529999359,
+      "elapsed_s": 1098.357017900038
+    },
+    {
+      "generation": 16,
+      "terrain_seed": 1490541956,
+      "terrain_seeds": [
+        1490541956,
+        1635584653
+      ],
+      "best": 364.93327221108086,
+      "best_distance_m": 364.93327221108086,
+      "best_distances_m": [
+        359.73419563709035,
+        370.1323487850714
+      ],
+      "best_total_violation": 0.0,
+      "best_legal": true,
+      "best_status": "dead:stuck",
+      "best_statuses": [
+        "dead:stuck",
+        "dead:stuck"
+      ],
+      "best_section": "climb",
+      "best_sections": [
+        "climb",
+        "climb"
+      ],
+      "mean": 317.2702663902847,
+      "median": 347.19345762291334,
+      "finished": 0,
+      "finished_by_seed": [
+        0,
+        0
+      ],
+      "legal": 30,
+      "stop_cluster_by_seed": [
+        0.7333333333333333,
+        0.6666666666666666
+      ],
+      "stop_cluster_scored": 0.5666666666666667,
+      "diversity": 0.05689928298631555,
+      "sigma": 0.1,
+      "eval_s": 102.17109760001767,
+      "elapsed_s": 1200.989956400008
+    },
+    {
+      "generation": 17,
+      "terrain_seed": 1717638702,
+      "terrain_seeds": [
+        1717638702,
+        463844455
+      ],
+      "best": 372.4590754318427,
+      "best_distance_m": 372.4590754318427,
+      "best_distances_m": [
+        372.45766228843934,
+        372.460488575246
+      ],
+      "best_total_violation": 0.0,
+      "best_legal": true,
+      "best_status": "finished",
+      "best_statuses": [
+        "finished",
+        "finished"
+      ],
+      "best_section": "climb",
+      "best_sections": [
+        "climb",
+        "climb"
+      ],
+      "mean": 366.26030426319636,
+      "median": 368.8261048868228,
+      "finished": 15,
+      "finished_by_seed": [
+        26,
+        16
+      ],
+      "legal": 30,
+      "stop_cluster_by_seed": [
+        0.8666666666666667,
+        0.5333333333333333
+      ],
+      "stop_cluster_scored": 0.5,
+      "diversity": 0.05613667582479864,
+      "sigma": 0.1,
+      "eval_s": 111.24429180001607,
+      "elapsed_s": 1312.6212945000152
+    },
+    {
+      "generation": 18,
+      "terrain_seed": 28524507,
+      "terrain_seeds": [
+        28524507,
+        509736806
+      ],
+      "best": 372.45953952012684,
+      "best_distance_m": 372.45953952012684,
+      "best_distances_m": [
+        372.4579364769389,
+        372.46114256331475
+      ],
+      "best_total_violation": 0.0,
+      "best_legal": true,
+      "best_status": "finished",
+      "best_statuses": [
+        "finished",
+        "finished"
+      ],
+      "best_section": "climb",
+      "best_sections": [
+        "climb",
+        "climb"
+      ],
+      "mean": 215.38604809982596,
+      "median": 205.81747747616478,
+      "finished": 4,
+      "finished_by_seed": [
+        6,
+        12
+      ],
+      "legal": 28,
+      "stop_cluster_by_seed": [
+        0.5666666666666667,
+        0.5333333333333333
+      ],
+      "stop_cluster_scored": 0.3333333333333333,
+      "diversity": 0.055624830697666154,
+      "sigma": 0.1,
+      "eval_s": 74.20708700001705,
+      "elapsed_s": 1387.3322956000338
+    },
+    {
+      "generation": 19,
+      "terrain_seed": 133741034,
+      "terrain_seeds": [
+        133741034,
+        1840323149
+      ],
+      "best": 372.45780315835304,
+      "best_distance_m": 372.45780315835304,
+      "best_distances_m": [
+        372.46223033105076,
+        372.4533759856553
+      ],
+      "best_total_violation": 0.0,
+      "best_legal": true,
+      "best_status": "finished",
+      "best_statuses": [
+        "finished",
+        "finished"
+      ],
+      "best_section": "climb",
+      "best_sections": [
+        "climb",
+        "climb"
+      ],
+      "mean": 255.97820087859412,
+      "median": 279.47133184965344,
+      "finished": 4,
+      "finished_by_seed": [
+        9,
+        8
+      ],
+      "legal": 28,
+      "stop_cluster_by_seed": [
+        0.3,
+        0.4
+      ],
+      "stop_cluster_scored": 0.16666666666666666,
+      "diversity": 0.053419661762036136,
+      "sigma": 0.1,
+      "eval_s": 84.72416160005378,
+      "elapsed_s": 1472.2813876
+    },
+    {
+      "generation": 20,
+      "terrain_seed": 1608970574,
+      "terrain_seeds": [
+        1608970574,
+        58044588
+      ],
+      "best": 372.4618936688966,
+      "best_distance_m": 372.4618936688966,
+      "best_distances_m": [
+        372.46311084913583,
+        372.4606764886574
+      ],
+      "best_total_violation": 0.0,
+      "best_legal": true,
+      "best_status": "finished",
+      "best_statuses": [
+        "finished",
+        "finished"
+      ],
+      "best_section": "climb",
+      "best_sections": [
+        "climb",
+        "climb"
+      ],
+      "mean": 354.9146194549112,
+      "median": 372.4553414497333,
+      "finished": 17,
+      "finished_by_seed": [
+        20,
+        27
+      ],
+      "legal": 29,
+      "stop_cluster_by_seed": [
+        0.6666666666666666,
+        0.9
+      ],
+      "stop_cluster_scored": 0.5666666666666667,
+      "diversity": 0.04784085033559719,
+      "sigma": 0.1,
+      "eval_s": 108.08045410003979,
+      "elapsed_s": 1580.7575695000123
+    },
+    {
+      "generation": 21,
+      "terrain_seed": 1144584834,
+      "terrain_seeds": [
+        1144584834,
+        1779501342
+      ],
+      "best": 223.29738494238666,
+      "best_distance_m": 223.29738494238666,
+      "best_distances_m": [
+        74.13572282987569,
+        372.4590470548976
+      ],
+      "best_total_violation": 0.0,
+      "best_legal": true,
+      "best_status": "dead:stuck",
+      "best_statuses": [
+        "dead:stuck",
+        "finished"
+      ],
+      "best_section": "rock_field",
+      "best_sections": [
+        "rock_field",
+        "climb"
+      ],
+      "mean": 220.56375378045553,
+      "median": 222.01699512852858,
+      "finished": 0,
+      "finished_by_seed": [
+        0,
+        21
+      ],
+      "legal": 30,
+      "stop_cluster_by_seed": [
+        0.6666666666666666,
+        0.7
+      ],
+      "stop_cluster_scored": 0.7,
+      "diversity": 0.051955503854560645,
+      "sigma": 0.1,
+      "eval_s": 69.92981060000602,
+      "elapsed_s": 1651.1891533000162
+    },
+    {
+      "generation": 22,
+      "terrain_seed": 245711410,
+      "terrain_seeds": [
+        245711410,
+        1768221561
+      ],
+      "best": 348.1795943810825,
+      "best_distance_m": 348.1795943810825,
+      "best_distances_m": [
+        372.4589386764945,
+        323.9002500856705
+      ],
+      "best_total_violation": 0.0,
+      "best_legal": true,
+      "best_status": "dead:None",
+      "best_statuses": [
+        "finished",
+        "dead:stuck"
+      ],
+      "best_section": "climb",
+      "best_sections": [
+        "climb",
+        "crater"
+      ],
+      "mean": 198.1980528418373,
+      "median": 211.60532415983022,
+      "finished": 0,
+      "finished_by_seed": [
+        1,
+        18
+      ],
+      "legal": 28,
+      "stop_cluster_by_seed": [
+        0.8333333333333334,
+        0.6
+      ],
+      "stop_cluster_scored": 0.5666666666666667,
+      "diversity": 0.055966711722268324,
+      "sigma": 0.1,
+      "eval_s": 63.770810100017115,
+      "elapsed_s": 1715.106182700023
+    },
+    {
+      "generation": 23,
+      "terrain_seed": 2096711932,
+      "terrain_seeds": [
+        2096711932,
+        1108172771
+      ],
+      "best": 372.46188988074465,
+      "best_distance_m": 372.46188988074465,
+      "best_distances_m": [
+        372.4615108721212,
+        372.4622688893681
+      ],
+      "best_total_violation": 0.0,
+      "best_legal": true,
+      "best_status": "finished",
+      "best_statuses": [
+        "finished",
+        "finished"
+      ],
+      "best_section": "climb",
+      "best_sections": [
+        "climb",
+        "climb"
+      ],
+      "mean": 304.6977865625728,
+      "median": 348.3528929979342,
+      "finished": 4,
+      "finished_by_seed": [
+        8,
+        18
+      ],
+      "legal": 28,
+      "stop_cluster_by_seed": [
+        0.4666666666666667,
+        0.6
+      ],
+      "stop_cluster_scored": 0.3,
+      "diversity": 0.05750423400134771,
+      "sigma": 0.1,
+      "eval_s": 94.84518179995939,
+      "elapsed_s": 1810.0782250000047
+    },
+    {
+      "generation": 24,
+      "terrain_seed": 943166001,
+      "terrain_seeds": [
+        943166001,
+        1835691973
+      ],
+      "best": 372.46110065192295,
+      "best_distance_m": 372.46110065192295,
+      "best_distances_m": [
+        372.45895610911987,
+        372.4632451947261
+      ],
+      "best_total_violation": 0.0,
+      "best_legal": true,
+      "best_status": "finished",
+      "best_statuses": [
+        "finished",
+        "finished"
+      ],
+      "best_section": "climb",
+      "best_sections": [
+        "climb",
+        "climb"
+      ],
+      "mean": 304.46076592656465,
+      "median": 372.4544575464254,
+      "finished": 16,
+      "finished_by_seed": [
+        19,
+        23
+      ],
+      "legal": 26,
+      "stop_cluster_by_seed": [
+        0.7,
+        0.7666666666666667
+      ],
+      "stop_cluster_scored": 0.7,
+      "diversity": 0.057817915525293986,
+      "sigma": 0.1,
+      "eval_s": 103.42649159999564,
+      "elapsed_s": 1913.9619830000447
+    },
+    {
+      "generation": 25,
+      "terrain_seed": 881298316,
+      "terrain_seeds": [
+        881298316,
+        1726304993
+      ],
+      "best": 372.463033223094,
+      "best_distance_m": 372.463033223094,
+      "best_distances_m": [
+        372.46355715929235,
+        372.4625092868956
+      ],
+      "best_total_violation": 0.0,
+      "best_legal": true,
+      "best_status": "finished",
+      "best_statuses": [
+        "finished",
+        "finished"
+      ],
+      "best_section": "climb",
+      "best_sections": [
+        "climb",
+        "climb"
+      ],
+      "mean": 303.39011414005284,
+      "median": 360.7448782843249,
+      "finished": 15,
+      "finished_by_seed": [
+        26,
+        17
+      ],
+      "legal": 27,
+      "stop_cluster_by_seed": [
+        0.8666666666666667,
+        0.5666666666666667
+      ],
+      "stop_cluster_scored": 0.5,
+      "diversity": 0.05489777969315886,
+      "sigma": 0.1,
+      "eval_s": 98.81805659999372,
+      "elapsed_s": 2013.254245100019
+    },
+    {
+      "generation": 26,
+      "terrain_seed": 175496633,
+      "terrain_seeds": [
+        175496633,
+        1573626568
+      ],
+      "best": 360.09936342404916,
+      "best_distance_m": 360.09936342404916,
+      "best_distances_m": [
+        372.4599211300623,
+        347.738805718036
+      ],
+      "best_total_violation": 0.0,
+      "best_legal": true,
+      "best_status": "dead:None",
+      "best_statuses": [
+        "finished",
+        "dead:stuck"
+      ],
+      "best_section": "climb",
+      "best_sections": [
+        "climb",
+        "climb"
+      ],
+      "mean": 294.3163017999523,
+      "median": 359.9326731221897,
+      "finished": 0,
+      "finished_by_seed": [
+        27,
+        0
+      ],
+      "legal": 27,
+      "stop_cluster_by_seed": [
+        0.9,
+        0.7333333333333333
+      ],
+      "stop_cluster_scored": 0.6666666666666666,
+      "diversity": 0.05578841878229091,
+      "sigma": 0.1,
+      "eval_s": 97.01760640001157,
+      "elapsed_s": 2110.78808030003
+    },
+    {
+      "generation": 27,
+      "terrain_seed": 170762025,
+      "terrain_seeds": [
+        170762025,
+        965607387
+      ],
+      "best": 372.4621788027853,
+      "best_distance_m": 372.4621788027853,
+      "best_distances_m": [
+        372.46292289987025,
+        372.4614347057003
+      ],
+      "best_total_violation": 0.0,
+      "best_legal": true,
+      "best_status": "finished",
+      "best_statuses": [
+        "finished",
+        "finished"
+      ],
+      "best_section": "climb",
+      "best_sections": [
+        "climb",
+        "climb"
+      ],
+      "mean": 281.95978363292545,
+      "median": 369.37426725655837,
+      "finished": 4,
+      "finished_by_seed": [
+        17,
+        5
+      ],
+      "legal": 29,
+      "stop_cluster_by_seed": [
+        0.5666666666666667,
+        0.7333333333333333
+      ],
+      "stop_cluster_scored": 0.43333333333333335,
+      "diversity": 0.05529785185988132,
+      "sigma": 0.1,
+      "eval_s": 88.79136590001872,
+      "elapsed_s": 2200.074197400012
+    },
+    {
+      "generation": 28,
+      "terrain_seed": 1689442280,
+      "terrain_seeds": [
+        1689442280,
+        516874147
+      ],
+      "best": 372.460624775572,
+      "best_distance_m": 372.460624775572,
+      "best_distances_m": [
+        372.45938148868873,
+        372.46186806245527
+      ],
+      "best_total_violation": 0.0,
+      "best_legal": true,
+      "best_status": "finished",
+      "best_statuses": [
+        "finished",
+        "finished"
+      ],
+      "best_section": "climb",
+      "best_sections": [
+        "climb",
+        "climb"
+      ],
+      "mean": 243.7736539414735,
+      "median": 213.5662374706552,
+      "finished": 4,
+      "finished_by_seed": [
+        27,
+        6
+      ],
+      "legal": 30,
+      "stop_cluster_by_seed": [
+        0.9,
+        0.4666666666666667
+      ],
+      "stop_cluster_scored": 0.6666666666666666,
+      "diversity": 0.05944019644126857,
+      "sigma": 0.1,
+      "eval_s": 77.57540269999299,
+      "elapsed_s": 2277.984575700015
+    },
+    {
+      "generation": 29,
+      "terrain_seed": 1672908937,
+      "terrain_seeds": [
+        1672908937,
+        1370744479
+      ],
+      "best": 372.46174078583323,
+      "best_distance_m": 372.46174078583323,
+      "best_distances_m": [
+        372.46050587707714,
+        372.4629756945893
+      ],
+      "best_total_violation": 0.0,
+      "best_legal": true,
+      "best_status": "finished",
+      "best_statuses": [
+        "finished",
+        "finished"
+      ],
+      "best_section": "climb",
+      "best_sections": [
+        "climb",
+        "climb"
+      ],
+      "mean": 342.6315886013744,
+      "median": 369.91528087473824,
+      "finished": 17,
+      "finished_by_seed": [
+        23,
+        23
+      ],
+      "legal": 28,
+      "stop_cluster_by_seed": [
+        0.7666666666666667,
+        0.7666666666666667
+      ],
+      "stop_cluster_scored": 0.5666666666666667,
+      "diversity": 0.05882909906199821,
+      "sigma": 0.1,
+      "eval_s": 104.79219680000097,
+      "elapsed_s": 2383.226331300044
+    }
+  ],
+  "validation": {
+    "seeds": [
+      1302828960,
+      899894886,
+      1371778638,
+      1512735633,
+      1692859205
+    ],
+    "candidates": [
+      {
+        "label": "final_best",
+        "genome": [
+          0.5777239014188038,
+          0.18626066383842094,
+          0.39668276356621057,
+          0.15210835409927115,
+          0.2741447365440975,
+          0.525603022256713,
+          0.2697160636264768,
+          0.6576211681210657,
+          0.43307364110543817,
+          0.42114738024734377,
+          0.887060650925247,
+          0.46662730480114134,
+          0.9235265461991298,
+          0.8984917559503423,
+          0.2929399754306903
+        ],
+        "decoded": {
+          "chassis_length_m": 2.6554478028376076,
+          "track_width_m": 1.7793909957576313,
+          "chassis_height_m": 0.4983413817831053,
+          "rocker_pivot_height_m": 0.5216866832794169,
+          "rocker_pivot_offset": -0.1355131580735415,
+          "rocker_front_arm_m": 1.025603022256713,
+          "rocker_rear_arm_m": 0.5427444572638291,
+          "bogie_length_m": 1.0576211681210657,
+          "wheel_diameter_m": 0.5165368205527191,
+          "wheel_width_m": 0.26845895209893755,
+          "motor_peak_torque_nm": 115.65167044063668,
+          "battery_energy_wh": 1319.3999125488692,
+          "target_speed_mps": 0.9464685823393908,
+          "torque_limit_fraction": 0.9289442291652394,
+          "slope_brake": 0.2929399754306903
+        },
+        "training_fitness": 372.46174078583323,
+        "seeds": [
+          1302828960,
+          899894886,
+          1371778638,
+          1512735633,
+          1692859205
+        ],
+        "distances_m": [
+          371.0919074050068,
+          372.45396291806964,
+          372.4561163488137,
+          42.58180776024444,
+          372.4605609918784
+        ],
+        "fitness": [
+          371.0919074050068,
+          372.45396291806964,
+          372.4561163488137,
+          42.58180776024444,
+          372.4605609918784
+        ],
+        "statuses": [
+          "dead:stuck",
+          "finished",
+          "finished",
+          "dead:stuck",
+          "finished"
+        ],
+        "finished_by_seed": [
+          false,
+          true,
+          true,
+          false,
+          true
+        ],
+        "sections": [
+          "climb",
+          "climb",
+          "climb",
+          "rock_field",
+          "climb"
+        ],
+        "finished": 3,
+        "mean_distance_m": 306.2088710848026,
+        "min_distance_m": 42.58180776024444,
+        "max_distance_m": 372.4605609918784,
+        "mean_fitness": 306.2088710848026,
+        "total_violation": 0.0,
+        "legal": true,
+        "violation_codes": []
+      },
+      {
+        "label": "final_2",
+        "genome": [
+          0.4857440199520785,
+          0.07176536795343176,
+          0.28804444275719465,
+          0.13659555744291366,
+          0.21807735932835176,
+          0.556173797264944,
+          0.28013445499997447,
+          0.721046092387796,
+          0.3775277417326872,
+          0.4589668395720887,
+          0.9180721758240773,
+          0.5002573759218452,
+          0.9355270924136944,
+          0.8107554579634715,
+          0.29093799945441984
+        ],
+        "decoded": {
+          "chassis_length_m": 2.471488039904157,
+          "track_width_m": 1.6076480519301477,
+          "chassis_height_m": 0.4440222213785973,
+          "rocker_pivot_height_m": 0.509276445954331,
+          "rocker_pivot_offset": -0.16915358440298894,
+          "rocker_front_arm_m": 1.056173797264944,
+          "rocker_rear_arm_m": 0.552121009499977,
+          "bogie_length_m": 1.1210460923877958,
+          "wheel_diameter_m": 0.4887638708663436,
+          "wheel_width_m": 0.28358673582883553,
+          "motor_peak_torque_nm": 124.2119657495053,
+          "battery_energy_wh": 1414.9706494808104,
+          "target_speed_mps": 0.954868964689586,
+          "torque_limit_fraction": 0.86752882057443,
+          "slope_brake": 0.29093799945441984
+        },
+        "training_fitness": 372.4610255605643,
+        "seeds": [
+          1302828960,
+          899894886,
+          1371778638,
+          1512735633,
+          1692859205
+        ],
+        "distances_m": [
+          372.4591240451307,
+          372.46153581918077,
+          372.4619653573057,
+          92.23352419706275,
+          349.81879124466815
+        ],
+        "fitness": [
+          372.4591240451307,
+          372.46153581918077,
+          372.4619653573057,
+          92.23352419706275,
+          349.81879124466815
+        ],
+        "statuses": [
+          "finished",
+          "finished",
+          "finished",
+          "dead:stuck",
+          "dead:stuck"
+        ],
+        "finished_by_seed": [
+          true,
+          true,
+          true,
+          false,
+          false
+        ],
+        "sections": [
+          "climb",
+          "climb",
+          "climb",
+          "rock_field",
+          "climb"
+        ],
+        "finished": 3,
+        "mean_distance_m": 311.8869881326696,
+        "min_distance_m": 92.23352419706275,
+        "max_distance_m": 372.4619653573057,
+        "mean_fitness": 311.8869881326696,
+        "total_violation": 0.0,
+        "legal": true,
+        "violation_codes": []
+      },
+      {
+        "label": "final_3",
+        "genome": [
+          0.583020442768335,
+          0.13576489369071312,
+          0.36920927157543326,
+          0.1432071866702032,
+          0.2811835508009712,
+          0.5095238906523657,
+          0.228946204859893,
+          0.6488032364929238,
+          0.5128495962169497,
+          0.45130233516651985,
+          0.9288542698041959,
+          0.46166086695179326,
+          0.9009899698846897,
+          0.9059479391433969,
+          0.2941995066533136
+        ],
+        "decoded": {
+          "chassis_length_m": 2.66604088553667,
+          "track_width_m": 1.7036473405360697,
+          "chassis_height_m": 0.4846046357877166,
+          "rocker_pivot_height_m": 0.5145657493361626,
+          "rocker_pivot_offset": -0.1312898695194173,
+          "rocker_front_arm_m": 1.0095238906523658,
+          "rocker_rear_arm_m": 0.5060515843739037,
+          "bogie_length_m": 1.0488032364929238,
+          "wheel_diameter_m": 0.5564247981084749,
+          "wheel_width_m": 0.28052093406660794,
+          "motor_peak_torque_nm": 127.33433626284456,
+          "battery_energy_wh": 1305.8440382954184,
+          "target_speed_mps": 0.9306929789192828,
+          "torque_limit_fraction": 0.9341635574003777,
+          "slope_brake": 0.2941995066533136
+        },
+        "training_fitness": 372.4610182591407,
+        "seeds": [
+          1302828960,
+          899894886,
+          1371778638,
+          1512735633,
+          1692859205
+        ],
+        "distances_m": [
+          364.0438033525111,
+          372.4536736165509,
+          372.46067166765033,
+          91.85306247279176,
+          372.45952746077603
+        ],
+        "fitness": [
+          364.0438033525111,
+          372.4536736165509,
+          372.46067166765033,
+          91.85306247279176,
+          372.45952746077603
+        ],
+        "statuses": [
+          "dead:stuck",
+          "finished",
+          "finished",
+          "dead:stuck",
+          "finished"
+        ],
+        "finished_by_seed": [
+          false,
+          true,
+          true,
+          false,
+          true
+        ],
+        "sections": [
+          "climb",
+          "climb",
+          "climb",
+          "rock_field",
+          "climb"
+        ],
+        "finished": 3,
+        "mean_distance_m": 314.654147714056,
+        "min_distance_m": 91.85306247279176,
+        "max_distance_m": 372.46067166765033,
+        "mean_fitness": 314.654147714056,
+        "total_violation": 0.0,
+        "legal": true,
+        "violation_codes": []
+      },
+      {
+        "label": "best_ever",
+        "genome": [
+          0.6263588826196056,
+          0.0764340611064624,
+          0.44870914886751456,
+          0.16183400582816357,
+          0.364821489176427,
+          0.46469844337361266,
+          0.3042135335216429,
+          0.7927209777838474,
+          0.4722092389599989,
+          0.4591228292495061,
+          0.9993383746481888,
+          0.4718096389281883,
+          0.9783752653287137,
+          0.9066276530712889,
+          0.33767695314250534
+        ],
+        "decoded": {
+          "chassis_length_m": 2.752717765239211,
+          "track_width_m": 1.6146510916596937,
+          "chassis_height_m": 0.5243545744337572,
+          "rocker_pivot_height_m": 0.5294672046625308,
+          "rocker_pivot_offset": -0.0811071064941438,
+          "rocker_front_arm_m": 0.9646984433736127,
+          "rocker_rear_arm_m": 0.5737921801694785,
+          "bogie_length_m": 1.1927209777838472,
+          "wheel_diameter_m": 0.5361046194799994,
+          "wheel_width_m": 0.28364913169980244,
+          "motor_peak_torque_nm": 149.77165667799468,
+          "battery_energy_wh": 1333.6951289978442,
+          "target_speed_mps": 0.9848626857300995,
+          "torque_limit_fraction": 0.9346393571499021,
+          "slope_brake": 0.33767695314250534
+        },
+        "training_fitness": 372.463033223094,
+        "seeds": [
+          1302828960,
+          899894886,
+          1371778638,
+          1512735633,
+          1692859205
+        ],
+        "distances_m": [
+          372.4610412404387,
+          372.4544742911883,
+          372.46087623219876,
+          91.87915425815838,
+          372.4534225588931
+        ],
+        "fitness": [
+          372.4610412404387,
+          372.4544742911883,
+          372.46087623219876,
+          91.87915425815838,
+          372.4534225588931
+        ],
+        "statuses": [
+          "finished",
+          "finished",
+          "finished",
+          "dead:stuck",
+          "finished"
+        ],
+        "finished_by_seed": [
+          true,
+          true,
+          true,
+          false,
+          true
+        ],
+        "sections": [
+          "climb",
+          "climb",
+          "climb",
+          "rock_field",
+          "climb"
+        ],
+        "finished": 4,
+        "mean_distance_m": 316.34179371617546,
+        "min_distance_m": 91.87915425815838,
+        "max_distance_m": 372.4610412404387,
+        "mean_fitness": 316.34179371617546,
+        "total_violation": 0.0,
+        "legal": true,
+        "violation_codes": []
+      }
+    ],
+    "reference": {
+      "label": "reference",
+      "genome": [
+        0.25,
+        0.5333333333333332,
+        0.20000000000000007,
+        0.18750000000000006,
+        0.5,
+        0.7,
+        0.5555555555555556,
+        0.6000000000000001,
+        0.45000000000000007,
+        0.7500000000000001,
+        0.9030899869919436,
+        0.6666666666666666,
+        0.28571428571428575,
+        0.7142857142857143,
+        0.5
+      ],
+      "decoded": {
+        "chassis_length_m": 2.0,
+        "track_width_m": 2.3,
+        "chassis_height_m": 0.4,
+        "rocker_pivot_height_m": 0.55,
+        "rocker_pivot_offset": 0.0,
+        "rocker_front_arm_m": 1.2,
+        "rocker_rear_arm_m": 0.8,
+        "bogie_length_m": 1.0,
+        "wheel_diameter_m": 0.525,
+        "wheel_width_m": 0.4,
+        "motor_peak_torque_nm": 119.99999999999997,
+        "battery_energy_wh": 1999.9999999999998,
+        "target_speed_mps": 0.5,
+        "torque_limit_fraction": 0.8,
+        "slope_brake": 0.5
+      },
+      "training_fitness": null,
+      "seeds": [
+        1302828960,
+        899894886,
+        1371778638,
+        1512735633,
+        1692859205
+      ],
+      "distances_m": [
+        343.64486183726365,
+        324.33186087043197,
+        49.312238963952666,
+        42.088503353114085,
+        36.40054688682937
+      ],
+      "fitness": [
+        343.64486183726365,
+        324.33186087043197,
+        49.312238963952666,
+        42.088503353114085,
+        36.40054688682937
+      ],
+      "statuses": [
+        "dead:stuck",
+        "dead:stuck",
+        "dead:stuck",
+        "dead:stuck",
+        "dead:stuck"
+      ],
+      "finished_by_seed": [
+        false,
+        false,
+        false,
+        false,
+        false
+      ],
+      "sections": [
+        "climb",
+        "crater",
+        "rock_field",
+        "rock_field",
+        "rock_field"
+      ],
+      "finished": 0,
+      "mean_distance_m": 159.15560238231836,
+      "min_distance_m": 36.40054688682937,
+      "max_distance_m": 343.64486183726365,
+      "mean_fitness": 159.15560238231836,
+      "total_violation": 0.0,
+      "legal": true,
+      "violation_codes": []
+    }
+  },
+  "success": {
+    "criterion": "partial delivery, section 6.3: the best design is legal (feasible) and finishes on at least 3 of 5 validation terrains (with another number of validation terrains, the same share rounded up). The best design of a GA run is the final population's best (final_best); of a random search, its best design by training fitness (random_best)",
+    "required_finishes": 3,
+    "validation_seeds": 5,
+    "best": {
+      "label": "final_best",
+      "legal": true,
+      "finished": 3,
+      "seeds": 5,
+      "success": true
+    },
+    "top3": [
+      {
+        "label": "final_best",
+        "legal": true,
+        "finished": 3,
+        "seeds": 5,
+        "success": true
+      },
+      {
+        "label": "final_2",
+        "legal": true,
+        "finished": 3,
+        "seeds": 5,
+        "success": true
+      },
+      {
+        "label": "final_3",
+        "legal": true,
+        "finished": 3,
+        "seeds": 5,
+        "success": true
+      }
+    ],
+    "reference": {
+      "label": "reference",
+      "legal": true,
+      "finished": 0,
+      "seeds": 5,
+      "success": false
+    }
+  },
+  "final": {
+    "generation": 29,
+    "best_fitness": 372.46174078583323,
+    "best_genome": [
+      0.5777239014188038,
+      0.18626066383842094,
+      0.39668276356621057,
+      0.15210835409927115,
+      0.2741447365440975,
+      0.525603022256713,
+      0.2697160636264768,
+      0.6576211681210657,
+      0.43307364110543817,
+      0.42114738024734377,
+      0.887060650925247,
+      0.46662730480114134,
+      0.9235265461991298,
+      0.8984917559503423,
+      0.2929399754306903
+    ],
+    "best_details": {
+      "seed": 1672908937,
+      "distance_m": 372.46174078583323,
+      "total_violation": 0.0,
+      "legal": true,
+      "violations": [],
+      "violation_codes": [],
+      "status": "finished",
+      "reason": null,
+      "finished": true,
+      "section_reached": "climb",
+      "alive_time_s": 468.7799999996099,
+      "drive_energy_wh": 53.429915268757206,
+      "net_drain_wh": 52.12774860107697,
+      "total_mass_kg": 998.9334882237243,
+      "repairs": [],
+      "seeds": [
+        1672908937,
+        1370744479
+      ],
+      "distances_m": [
+        372.46050587707714,
+        372.4629756945893
+      ],
+      "min_distance_m": 372.46050587707714,
+      "max_distance_m": 372.4629756945893,
+      "finished_seeds": 2,
+      "per_seed": [
+        {
+          "seed": 1672908937,
+          "distance_m": 372.46050587707714,
+          "status": "finished",
+          "reason": null,
+          "finished": true,
+          "section_reached": "climb",
+          "alive_time_s": 468.7799999996099
+        },
+        {
+          "seed": 1370744479,
+          "distance_m": 372.4629756945893,
+          "status": "finished",
+          "reason": null,
+          "finished": true,
+          "section_reached": "climb",
+          "alive_time_s": 485.6199999995946
+        }
+      ]
+    },
+    "best_ever_generation": 25,
+    "best_ever_fitness": 372.463033223094
+  },
+  "timings": {
+    "total_s": 2427.466789900034,
+    "evaluation_s": 2373.8397888001055,
+    "per_generation_s": [
+      32.9918764999602,
+      26.584808200015686,
+      19.18139769998379,
+      39.94092359999195,
+      25.92592439998407,
+      56.11321899999166,
+      82.38410170003772,
+      81.68825499998638,
+      106.77160919999005,
+      92.72660120000364,
+      95.81641430000309,
+      97.23625109996647,
+      86.01492430001963,
+      69.53428290004376,
+      73.14939979999326,
+      108.38578529999359,
+      102.17109760001767,
+      111.24429180001607,
+      74.20708700001705,
+      84.72416160005378,
+      108.08045410003979,
+      69.92981060000602,
+      63.770810100017115,
+      94.84518179995939,
+      103.42649159999564,
+      98.81805659999372,
+      97.01760640001157,
+      88.79136590001872,
+      77.57540269999299,
+      104.79219680000097
+    ],
+    "validation_s": 43.63607319997391
+  }
+}

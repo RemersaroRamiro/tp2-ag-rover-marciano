@@ -1,0 +1,68 @@
+{
+  "source_url": "https://asc-pds-services.s3.us-west-2.amazonaws.com/mosaic/mars2020_trn/HiRISE/JEZ_hirise_soc_006_DTM_MOLAtopography_DeltaGeoid_1m_Eqc_latTs0_lon0_blend40.tif",
+  "product_name": "USGS Mars 2020 TRN HiRISE DTM mosaic, Jezero crater, 1 m/px",
+  "crs": "ESRI:103885",
+  "bounds_projected": {
+    "west": 4590298.0,
+    "south": 1093240.0,
+    "east": 4590698.0,
+    "north": 1093301.0
+  },
+  "bounds_units": "meters in the source CRS (pixel edges)",
+  "corners_lonlat": {
+    "south_west": {
+      "lon": 77.44110373899656,
+      "lat": 18.44362005508588
+    },
+    "south_east": {
+      "lon": 77.44785198093982,
+      "lat": 18.44362005508588
+    },
+    "north_east": {
+      "lon": 77.44785198093982,
+      "lat": 18.444649161982223
+    },
+    "north_west": {
+      "lon": 77.44110373899656,
+      "lat": 18.444649161982223
+    }
+  },
+  "line_start_lonlat": {
+    "lon": 77.44110373899656,
+    "lat": 18.44414304383648
+  },
+  "pixel_size_m": {
+    "x": 1.0,
+    "y": 1.0
+  },
+  "true_ground_m_per_pixel_x": 0.9486325875264322,
+  "true_ground_m_per_pixel_y": 1.0,
+  "shape": {
+    "rows_y": 61,
+    "cols_x": 400
+  },
+  "dtype": "float32",
+  "orientation": {
+    "array_layout": "(rows=y, cols=x)",
+    "row_0": "row 0 = SOUTH edge of the strip; +row = +y = north",
+    "col_0": "col 0 = WEST edge of the strip; +col = +x = east",
+    "flip": "the raster's native row 0 is north; the window was flipped vertically (np.flipud) before saving",
+    "sample_positions": "sample [i, j] is the pixel centered at x = west + (j + 0.5) * pixel_size_x, y = south + (i + 0.5) * pixel_size_y"
+  },
+  "elevation_m": {
+    "min": -2569.864501953125,
+    "max": -2555.454345703125,
+    "mean": -2565.17626953125
+  },
+  "nodata_count": 0,
+  "extraction_date": "2026-09-30",
+  "estimated_bytes_read": 5221600,
+  "estimated_bytes_method": "rows_touched x full_row_width x 4 bytes (striped float32, one block per scanline)",
+  "line": {
+    "name": "jezero_floor",
+    "start_x": 4590298.0,
+    "y": 1093271.0,
+    "center_row_index_in_strip": 30,
+    "note": "center row of the strip is the line the track follows (row index rows_y // 2)"
+  }
+}
